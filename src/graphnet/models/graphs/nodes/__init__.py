@@ -6,3 +6,4 @@ and their features.
 """
 
 from .nodes import NodeDefinition, NodesAsPulses
+from .cropped_nodes import PulsesCroppedRandomly, PulsesCroppedValue

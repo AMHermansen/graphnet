@@ -26,7 +26,7 @@ class PulsesCroppedValue(NodeDefinition):
 
         Args:
             max_pulses: Maximal number of pulses allowed in a pulsemap.
-             transform: Transform applied to the input tensor.
+             transform: Transform applied to the input tensor, before determining order.
             **kwargs: kwargs passed to NodeDefinitions constructor.
         """
         super().__init__(**kwargs)
@@ -39,7 +39,7 @@ class PulsesCroppedValue(NodeDefinition):
             return Data(x=x)
         return Data(
             x=x[
-                torch.sort(self.transform(x[self.sort_index]), dim=0).indices,
+                torch.sort(self.transform(x), dim=0).indices,
                 :,
             ]
         )
