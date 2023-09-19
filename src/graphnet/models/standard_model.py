@@ -232,7 +232,7 @@ class StandardModel(Model):
     ) -> Tensor:
         """Compute and sum losses across tasks."""
         losses = [
-            task.compute_loss(pred, data)
+            task._compute_loss(pred, data)
             for task, pred in zip(self._tasks, preds)
         ]
         if verbose:
