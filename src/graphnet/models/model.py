@@ -6,12 +6,13 @@ import os.path
 from typing import Any, Dict, List, Optional, Union
 
 import torch
+from pytorch_lightning import LightningModule
 
 from graphnet.utilities.logging import Logger
 from graphnet.utilities.config import Configurable, ModelConfig
 
 
-class Model(Logger, Configurable, torch.nn.Module, ABC):
+class Model(Logger, Configurable, LightningModule, ABC):
     """Base class for all models in graphnet."""
 
     def save(self, path: str) -> None:

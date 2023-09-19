@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from pytorch_lightning import Callback, Trainer
+from pytorch_lightning import Callback, Trainer, LightningModule
 from pytorch_lightning.callbacks import EarlyStopping
 from torch import Tensor
 from torch.nn import ModuleList
@@ -286,7 +286,6 @@ class StandardModel(Model):
             torch.cat([preds[ix] for preds in predictions_list], dim=0)
             for ix in range(nb_outputs)
         ]
-
         return predictions
 
     def predict_as_dataframe(
@@ -351,22 +350,23 @@ class StandardModel(Model):
                 # Check if node level predictions
                 # If true, additional attributes are repeated
                 # to make dimensions fit
-                if len(attribute) < np.sum(
-                    batch.n_pulses.detach().cpu().numpy()
-                ):
-                    attribute = np.repeat(
-                        attribute, batch.n_pulses.detach().cpu().numpy()
-                    )
-                    try:
-                        assert len(attribute) == len(batch.x)
-                    except AssertionError:
-                        self.warning_once(
-                            "Could not automatically adjust length"
-                            f"of additional attribute {attr} to match length of"
-                            f"predictions. Make sure {attr} is a graph-level or"
-                            "node-level attribute. Attribute skipped."
+                if len(predictions) != len(dataloader.dataset):
+                    if len(attribute) < np.sum(
+                        batch.n_pulses.detach().cpu().numpy()
+                    ):
+                        attribute = np.repeat(
+                            attribute, batch.n_pulses.detach().cpu().numpy()
                         )
-                        pass
+                        try:
+                            assert len(attribute) == len(batch.x)
+                        except AssertionError:
+                            self.warning_once(
+                                "Could not automatically adjust length"
+                                f"of additional attribute {attr} to match length of"
+                                f"predictions. Make sure {attr} is a graph-level or"
+                                "node-level attribute. Attribute skipped."
+                            )
+                            pass
                 attributes[attr].extend(attribute)
 
         data = np.concatenate(
