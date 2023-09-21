@@ -12,7 +12,7 @@ from torch_geometric.nn.inits import reset
 from torch.nn.modules import TransformerEncoder, TransformerEncoderLayer
 from torch.nn.modules.normalization import LayerNorm
 from torch_geometric.utils import to_dense_batch
-from pytorch_lightning import LightningModule
+from lightning import LightningModule
 
 
 class DynEdgeConv(EdgeConv, LightningModule):

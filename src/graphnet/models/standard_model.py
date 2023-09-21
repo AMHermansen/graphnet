@@ -4,18 +4,17 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
-from pytorch_lightning import Callback, Trainer, LightningModule
-from pytorch_lightning.callbacks import EarlyStopping
+from lightning.pytorch import Callback, Trainer
+from lightning.pytorch.callbacks import EarlyStopping
 from torch import Tensor
 from torch.nn import ModuleList
 from torch.optim import Adam
 from torch.utils.data import DataLoader, SequentialSampler
 from torch_geometric.data import Data
 import pandas as pd
-from pytorch_lightning.loggers.logger import Logger as LightningLogger
+from lightning.pytorch.loggers.logger import Logger as LightningLogger
 
 from graphnet.training.callbacks import ProgressBar
-from graphnet.utilities.config import save_model_config
 from graphnet.models.graphs import GraphDefinition
 from graphnet.models.gnn.gnn import GNN
 from graphnet.models.model import Model
@@ -25,8 +24,9 @@ from graphnet.models.task import Task
 class StandardModel(Model):
     """Main class for standard models in graphnet.
 
-    This class chains together the different elements of a complete GNN-based
-    model (detector read-in, GNN architecture, and task-specific read-outs).
+    This class chains together the different elements of a complete GNN-
+    based model (detector read-in, GNN architecture, and task-specific
+    read-outs).
     """
 
     def __init__(
@@ -191,8 +191,8 @@ class StandardModel(Model):
     def shared_step(self, batch: Data, batch_idx: int) -> Tensor:
         """Perform shared step.
 
-        Applies the forward pass and the following loss calculation, shared
-        between the training and validation step.
+        Applies the forward pass and the following loss calculation,
+        shared between the training and validation step.
         """
         preds = self(batch)
         loss = self.compute_loss(preds, batch)
@@ -298,8 +298,8 @@ class StandardModel(Model):
     ) -> pd.DataFrame:
         """Return predictions for `dataloader` as a DataFrame.
 
-        Include `additional_attributes` as additional columns in the output
-        DataFrame.
+        Include `additional_attributes` as additional columns in the
+        output DataFrame.
         """
         if prediction_columns is None:
             prediction_columns = self.prediction_labels

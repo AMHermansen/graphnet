@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from pytorch_lightning import Trainer
+from lightning import Trainer
 import sqlite3
 import torch
 from torch.utils.data import DataLoader
@@ -23,8 +23,8 @@ from graphnet.utilities.logging import Logger
 class InSQLitePipeline(ABC, Logger):
     """Create a SQLite database for PISA analysis.
 
-    The database will contain truth and GNN predictions and, if available,
-    RETRO reconstructions.
+    The database will contain truth and GNN predictions and, if
+    available, RETRO reconstructions.
     """
 
     def __init__(

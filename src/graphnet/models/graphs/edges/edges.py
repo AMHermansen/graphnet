@@ -50,7 +50,7 @@ class KNNEdges(EdgeDefinition):  # pylint: disable=too-few-public-methods
     def __init__(
         self,
         nb_nearest_neighbours: int,
-        columns: List[int] = [0, 1, 2],
+        columns: List[int] = None,
     ):
         """K-NN Edge definition.
 
@@ -67,7 +67,7 @@ class KNNEdges(EdgeDefinition):  # pylint: disable=too-few-public-methods
 
         # Member variable(s)
         self._nb_nearest_neighbours = nb_nearest_neighbours
-        self._columns = columns
+        self._columns = columns or [0, 1, 2]
 
     def _construct_edges(self, graph: Data) -> Data:
         """Define K-NN edges."""

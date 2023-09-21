@@ -1,8 +1,8 @@
 """Modules for defining graphs.
 
-These are self-contained graph definitions that hold all the graph-altering
-code in graphnet. These modules define what the GNNs sees as input and can be
-passed to dataloaders during training and deployment.
+These are self-contained graph definitions that hold all the graph-
+altering code in graphnet. These modules define what the GNNs sees as
+input and can be passed to dataloaders during training and deployment.
 """
 
 
@@ -26,7 +26,7 @@ class GraphDefinition(Model):
         node_definition: NodeDefinition,
         edge_definition: Optional[EdgeDefinition] = None,
         node_feature_names: Optional[List[str]] = None,
-        dtype: Optional[torch.dtype] = torch.float,
+        dtype: Optional[torch.dtype] = torch.float32,
     ):
         """Construct ´GraphDefinition´. The ´detector´ holds.
 

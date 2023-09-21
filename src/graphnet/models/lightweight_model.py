@@ -23,6 +23,7 @@ class LightweightModel(Model):
     def __init__(
         self,
         *,
+        graph_definition: GraphDefinition,
         gnn: GNN,
         tasks: Union[Task, List[Task]],
         optimizer_class: type = Adam,
@@ -34,6 +35,7 @@ class LightweightModel(Model):
         """Construct lightweight lightning model.
 
         Args:
+            graph_definition: NOT USED HERE ONLY FOR OVERLY VERBOSE BOILERPLATE DRIVEN CODE DESIGN.
             gnn: GNN backbone used.
             tasks: Which task the model is trained for.
             optimizer_class: Optimizer used to train.
@@ -53,6 +55,7 @@ class LightweightModel(Model):
         assert isinstance(gnn, GNN)
 
         # Member variable(s)
+        self._graph_definition = graph_definition  # Preprocessing step only done in data, but here for config recon.
         self._gnn = gnn
         self._tasks = ModuleList(tasks)
         self._optimizer_class = optimizer_class
@@ -131,8 +134,8 @@ class LightweightModel(Model):
     def _shared_step(self, batch: Data, batch_idx: int) -> Tensor:
         """Perform shared step.
 
-        Applies the forward pass and the following loss calculation, shared
-        between the training and validation step.
+        Applies the forward pass and the following loss calculation,
+        shared between the training and validation step.
         """
         preds = self._gnn(batch)  # noqa
 

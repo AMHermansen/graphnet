@@ -95,4 +95,7 @@ setup(
     install_requires=INSTALL_REQUIRES,
     extras_require=EXTRAS_REQUIRE,
     classifiers=CLASSIFIERS,
+    entry_points={
+        "console_scripts": ["graphnet = graphnet.cli.main:main_cli"]
+    },
 )

@@ -22,7 +22,6 @@ GLOBAL_POOLINGS = {
 class ODynEdge(GNN):
     """DynEdge (dynamical edge convolutional) model."""
 
-    @save_model_config
     def __init__(
         self,
         nb_inputs: int,
