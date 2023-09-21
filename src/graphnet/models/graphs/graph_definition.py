@@ -150,7 +150,7 @@ class GraphDefinition(Model):
         return graph
 
     def _validate_input(
-        self, node_features: np.array, node_feature_names: List[str]
+        self, node_features: np.ndarray, node_feature_names: List[str]
     ) -> None:
         # node feature matrix dimension check
         assert node_features.shape[1] == len(node_feature_names)

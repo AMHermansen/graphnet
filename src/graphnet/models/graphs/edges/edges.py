@@ -75,7 +75,7 @@ class KNNEdges(EdgeDefinition):  # pylint: disable=too-few-public-methods
             graph.x[:, self._columns],
             self._nb_nearest_neighbours,
             graph.batch,
-        ).to(self.device)
+        )
 
         return graph
 
