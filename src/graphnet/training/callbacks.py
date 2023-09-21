@@ -1,22 +1,28 @@
 """Callback class(es) for using during model training."""
 
 import logging
-from typing import Dict, List
+import os
+from collections.abc import Sequence
+from itertools import chain
+from typing import Dict, List, Optional, Any, Union
 import warnings
 
 import numpy as np
+import pandas as pd
+from torch_geometric.data import Batch
 from tqdm.std import Bar
 
-from pytorch_lightning import LightningModule, Trainer
-from pytorch_lightning.callbacks import TQDMProgressBar
-from pytorch_lightning.utilities import rank_zero_only
+from lightning import LightningModule, Trainer
+from lightning.pytorch.callbacks import TQDMProgressBar, Callback
+from lightning.pytorch.utilities import rank_zero_only
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import LRScheduler
 
+from graphnet.models.lightweight_model import LightweightModel
 from graphnet.utilities.logging import Logger
 
 
-class PiecewiseLinearLR(_LRScheduler):
+class PiecewiseLinearLR(LRScheduler):
     """Interpolate learning rate linearly between milestones."""
 
     def __init__(
@@ -152,3 +158,91 @@ class ProgressBar(TQDMProgressBar):
             h.setLevel(logging.ERROR)
             logger.info(str(super().train_progress_bar))
             h.setLevel(level)
+
+
+class WriteValToParquet(Callback):
+    """Callback to write validation predictions to parquet."""
+
+    _file_extension = ".parquet"
+
+    def __init__(
+        self,
+        output_dir: str,
+        output_file_prefix: str = "validation_result",
+        additional_attributes: Optional[List[str]] = None,
+        prediction_labels: Optional[List[str]] = None,
+        val_epoch_frequency: int = 1,
+    ):
+        """Construct ´WriteValToParquet´ callback to store val results.
+
+        Args:
+            output_dir: Directory of parquet files.
+            output_file_prefix: Prefix in output_files.
+            additional_attributes: Additional attributes to extract.
+            prediction_labels: Labels to predict. If None extracts values from LightweightModel.
+            val_epoch_frequency: Frequency of writing. Defaults to 1 i.e. every epoch is written.
+        """
+        self._output_dir = output_dir
+        self._output_file_prefix = output_file_prefix
+        self._additional_attributes = additional_attributes or []
+        self._prediction_labels = prediction_labels
+        self._val_epoch_frequency = val_epoch_frequency
+        self._cache: Dict[str, List] = {}
+
+    def on_fit_start(self, trainer: Trainer, model: LightweightModel) -> None:
+        """Reset cache."""
+        self._reset_cache(model)
+
+    def on_validation_batch_end(
+        self,
+        trainer: Trainer,
+        model: LightweightModel,
+        outputs: Any,
+        batch: Any,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+        """Write results to cache if relevant epoch."""
+        if (
+            trainer.current_epoch % self._val_epoch_frequency
+            == self._val_epoch_frequency - 1
+        ):
+            self._write_to_cache(outputs, batch, model)
+
+    def on_validation_epoch_end(
+        self, trainer: Trainer, model: LightweightModel
+    ) -> None:
+        """Write cache to parquet and reset."""
+        if (
+            trainer.current_epoch % self._val_epoch_frequency
+            == self._val_epoch_frequency - 1
+        ):
+            self._write_cache_to_disk(
+                os.path.join(
+                    self._output_dir,
+                    f"{self._output_file_prefix}_epoch{trainer.current_epoch}{self._file_extension}",
+                )
+            )
+            self._reset_cache(model)
+
+    def _reset_cache(self, model: LightweightModel) -> None:
+        if self._prediction_labels is None:
+            self._prediction_labels = model.prediction_labels
+        self._cache = {
+            k: []
+            for k in chain(
+                self._additional_attributes, self._prediction_labels
+            )
+        }
+
+    def _write_to_cache(
+        self, outputs: Any, batch: Batch, model: LightweightModel
+    ) -> None:
+        for idx, pred_label in enumerate(model.prediction_labels):
+            self._cache[pred_label] += outputs[:, idx].tolist()
+        for idx, attribute in enumerate(self._additional_attributes):
+            self._cache[attribute].extend(batch[attribute])
+
+    def _write_cache_to_disk(self, filename: str) -> None:
+        df = pd.DataFrame(self._cache)
+        df.to_parquet(filename)

@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple, Union, Callable
 
 import numpy as np
 import pandas as pd
-from pytorch_lightning import Trainer
+from lightning import Trainer
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from torch_geometric.data import Batch, Data

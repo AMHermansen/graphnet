@@ -17,14 +17,12 @@ from graphnet.utilities.config import save_model_config
 class LightweightModel(Model):
     """A more lightweight version of StandardModel.
 
-    More in line with the styleguide of Lightning
+    More in line with the styleguide of Lightning.
     """
 
-    @save_model_config
     def __init__(
         self,
         *,
-        graph_definition: GraphDefinition,
         gnn: GNN,
         tasks: Union[Task, List[Task]],
         optimizer_class: type = Adam,
@@ -36,16 +34,14 @@ class LightweightModel(Model):
         """Construct lightweight lightning model.
 
         Args:
-            graph_definition: GraphDefinition used to create the input graph for the GNN.
             gnn: GNN backbone used.
             tasks: Which task the model is trained for.
-            optimizer_class: Optimzer used to train.
+            optimizer_class: Optimizer used to train.
             optimizer_kwargs: keyword-args for optimizer.
             scheduler_class: Learning rate scheduler for the optimizer.
             scheduler_kwargs: Scheduler keyword-args.
             scheduler_config: Remaining config for scheduler.
         """
-        """Construct `StandardModel`."""
         # Base class constructor
         super().__init__(name=__name__, class_name=self.__class__.__name__)
 
@@ -54,11 +50,9 @@ class LightweightModel(Model):
             tasks = [tasks]
         assert isinstance(tasks, (list, tuple))
         assert all(isinstance(task, Task) for task in tasks)
-        assert isinstance(graph_definition, GraphDefinition)
         assert isinstance(gnn, GNN)
 
         # Member variable(s)
-        self._graph_definition = graph_definition
         self._gnn = gnn
         self._tasks = ModuleList(tasks)
         self._optimizer_class = optimizer_class
@@ -66,9 +60,6 @@ class LightweightModel(Model):
         self._scheduler_class = scheduler_class
         self._scheduler_kwargs = scheduler_kwargs or dict()
         self._scheduler_config = scheduler_config or dict()
-
-        # set dtype of GNN from graph_definition
-        self._gnn.type(self._graph_definition._dtype)
 
     @property
     def target_labels(self) -> List[str]:
@@ -89,9 +80,12 @@ class LightweightModel(Model):
         preds = [task(x) for task in self._tasks]
         return preds
 
-    def training_step(self, train_batch: Data, batch_idx: int) -> Tensor:
+    def training_step(
+        self, train_batch: Data, batch_idx: int
+    ) -> Dict[str, Any]:
         """Perform training step."""
-        loss = self._shared_step(train_batch, batch_idx)
+        preds = self._shared_step(train_batch, batch_idx)
+        loss = self._compute_loss(preds, train_batch)
         self.log(
             "train_loss",
             loss,
@@ -101,11 +95,14 @@ class LightweightModel(Model):
             on_step=False,
             sync_dist=True,
         )
-        return loss
+        return {"loss": loss, "preds": preds}
 
-    def validation_step(self, val_batch: Data, batch_idx: int) -> Tensor:
+    def validation_step(
+        self, val_batch: Data, batch_idx: int
+    ) -> Dict[str, Any]:
         """Perform validation step."""
-        loss = self._shared_step(val_batch, batch_idx)
+        preds = self._shared_step(val_batch, batch_idx)
+        loss = self._compute_loss(preds, val_batch)
         self.log(
             "val_loss",
             loss,
@@ -115,7 +112,21 @@ class LightweightModel(Model):
             on_step=False,
             sync_dist=True,
         )
-        return loss
+        return {"loss": loss, "preds": preds}
+
+    def test_step(self, test_batch: Data, batch_idx: int) -> Dict[str, Any]:
+        """Perform test step."""
+        preds = self._shared_step(test_batch, batch_idx)
+        loss = self._compute_loss(preds, test_batch)
+        self.log(
+            "test_loss",
+            loss,
+            batch_size=self._get_batch_size(test_batch),
+            prog_bar=True,
+            on_epoch=True,
+            on_step=False,
+        )
+        return {"loss": loss, "preds": preds}
 
     def _shared_step(self, batch: Data, batch_idx: int) -> Tensor:
         """Perform shared step.
@@ -123,9 +134,9 @@ class LightweightModel(Model):
         Applies the forward pass and the following loss calculation, shared
         between the training and validation step.
         """
-        preds = self(batch)
-        loss = self._compute_loss(preds, batch)
-        return loss
+        preds = self._gnn(batch)  # noqa
+
+        return preds
 
     def _compute_loss(
         self, preds: Tensor, data: Data, verbose: bool = False
@@ -140,9 +151,10 @@ class LightweightModel(Model):
         assert all(
             loss.dim() == 0 for loss in losses
         ), "Please reduce loss for each task separately"
-        return torch.sum(torch.stack(losses))
+        return torch.mean(torch.stack(losses))
 
-    def _get_batch_size(self, data: Data) -> int:
+    @staticmethod
+    def _get_batch_size(data: Data) -> int:
         """Get batch size."""
         return torch.numel(torch.unique(data.batch))
 
@@ -167,16 +179,3 @@ class LightweightModel(Model):
                 }
             )
         return config
-
-    def inference(self) -> None:
-        """Activate inference mode."""
-        for task in self._tasks:
-            task.inference()
-
-    def train(self, mode: bool = True) -> "Model":
-        """Deactivate inference mode."""
-        super().train(mode)
-        if mode:
-            for task in self._tasks:
-                task.train_eval()
-        return self

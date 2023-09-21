@@ -29,7 +29,6 @@ class StandardModel(Model):
     model (detector read-in, GNN architecture, and task-specific read-outs).
     """
 
-    @save_model_config
     def __init__(
         self,
         *,

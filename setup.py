@@ -52,7 +52,8 @@ EXTRAS_REQUIRE = {
         "torch-scatter>=2.0",
         "torch-sparse>=0.6",
         "torch-geometric>=2.1",
-        "pytorch-lightning>=2.0",
+        "lightning[extra]>=2.0",
+        "torchmetrics[visual]",
     ],
 }
 

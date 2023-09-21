@@ -9,6 +9,7 @@ import torch
 from torch import Tensor
 from torch.nn import Linear
 from torch_geometric.data import Data
+from torchmetrics import Metric
 
 if TYPE_CHECKING:
     # Avoid cyclic dependency
@@ -43,6 +44,7 @@ class Task(Model):
         *,
         hidden_size: int,
         loss_function: "LossFunction",
+        additional_metrics: Optional[Union[List[Metric], Metric]] = None,
         target_labels: Optional[Union[str, List[str]]] = None,
         prediction_labels: Optional[Union[str, List[str]]] = None,
         transform_prediction_and_target: Optional[Callable] = None,
@@ -58,6 +60,7 @@ class Task(Model):
                 tasks, used to construct the affine transformation to the
                 predicted quantity.
             loss_function: Loss function appropriate to the task.
+            additional_metrics: Additional_metrics to keep track of.
             target_labels: Name(s) of the quantity/-ies being predicted, used
                 to extract the  target tensor(s) from the `Data` object in
                 `.compute_loss(...)`.
@@ -83,7 +86,7 @@ class Task(Model):
             transform_support: Optional tuple to specify minimum and maximum
                 of the range of validity for the inverse transforms
                 `transform_target` and `transform_inference` in case this is
-                restricted. By default the invertibility of `transform_target`
+                restricted. By default, the invertibility of `transform_target`
                 is tested on the range [-1e6, 1e6].
             loss_weight: Name of the attribute in `data` containing per-event
                 loss weights.
@@ -95,6 +98,8 @@ class Task(Model):
             target_labels = self.default_target_labels
         if isinstance(target_labels, str):
             target_labels = [target_labels]
+        if isinstance(additional_metrics, Metric):
+            additional_metrics = [additional_metrics]
 
         if prediction_labels is None:
             prediction_labels = self.default_prediction_labels
@@ -127,6 +132,8 @@ class Task(Model):
 
         # Mapping from last hidden layer to required size of input
         self._affine = Linear(hidden_size, self.nb_inputs)
+
+        self.additional_metrics = additional_metrics
 
     @final
     def forward(self, x: Union[Tensor, Data]) -> Union[Tensor, Data]:
