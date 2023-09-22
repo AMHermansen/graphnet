@@ -13,11 +13,11 @@ class GraphnetCLI(LightningCLI):
         )
         parser.link_arguments(
             "data.graph_definition.nb_outputs",
-            "model.gnn.nb_inputs",
+            "model.gnn.init_args.nb_inputs",
             apply_on="instantiate",
         )
         parser.link_arguments(
-            "model.gnn.nb_outputs",
-            "model.task.hidden_size",
-            apply_on="instantiate",
+            "model.gnn.layer",
+            "model.tasks.init_args.hidden_size",
+            apply_on="parse",
         )

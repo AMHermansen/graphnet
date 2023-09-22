@@ -26,7 +26,7 @@ class GraphDefinition(Model):
         node_definition: NodeDefinition,
         edge_definition: Optional[EdgeDefinition] = None,
         node_feature_names: Optional[List[str]] = None,
-        dtype: Optional[torch.dtype] = torch.float32,
+        # dtype: Optional[torch.dtype] = torch.float32,
     ):
         """Construct ´GraphDefinition´. The ´detector´ holds.
 
@@ -57,7 +57,7 @@ class GraphDefinition(Model):
         self._node_feature_names = node_feature_names
 
         # Set data type
-        self.to(dtype)
+        # self.to(dtype)
 
         # Set Input / Output dimensions
         self._node_definition.set_number_of_inputs(

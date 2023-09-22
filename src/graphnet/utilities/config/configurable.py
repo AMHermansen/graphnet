@@ -37,3 +37,10 @@ class Configurable(ABC):
     @abstractclassmethod
     def from_config(cls, source: Union[BaseConfig, str]) -> Any:
         """Construct instance from `source` configuration."""
+
+    @staticmethod
+    def _parse_string(s: str) -> Any:
+        if not isinstance(s, str):
+            raise ValueError("Can only parse strings")
+        if s[0] == "!":
+            return eval(s[1:])

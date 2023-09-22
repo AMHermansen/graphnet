@@ -43,15 +43,15 @@ class Task(Model):
         self,
         *,
         hidden_size: int,
-        loss_function: "LossFunction",
+        loss_function: Union[str, "LossFunction"],
         additional_metrics: Optional[Union[List[Metric], Metric]] = None,
         target_labels: Optional[Union[str, List[str]]] = None,
         prediction_labels: Optional[Union[str, List[str]]] = None,
-        transform_prediction_and_target: Optional[Callable] = None,
-        transform_target: Optional[Callable] = None,
-        transform_inference: Optional[Callable] = None,
-        transform_support: Optional[Tuple] = None,
-        loss_weight: Optional[str] = None,
+        transform_prediction_and_target: Optional[Union[Callable, str]] = None,
+        transform_target: Optional[Union[Callable, str]] = None,
+        transform_inference: Optional[Union[Callable, str]] = None,
+        transform_support: Optional[Union[Callable, str]] = None,
+        loss_weight: Optional[Union[Callable, str]] = None,
     ):
         """Construct `Task`.
 
@@ -106,6 +106,9 @@ class Task(Model):
         if isinstance(prediction_labels, str):
             prediction_labels = [prediction_labels]
 
+        if isinstance(loss_function, str):
+            loss_function = self._parse_string(loss_function)
+
         assert isinstance(target_labels, List)  # mypy
         assert isinstance(prediction_labels, List)  # mypy
         # Member variables
@@ -123,11 +126,23 @@ class Task(Model):
             [Tensor], Tensor
         ] = lambda x: x
         self._transform_target: Callable[[Tensor], Tensor] = lambda x: x
+
+        if isinstance(transform_prediction_and_target, str):
+            transform_prediction_and_target = self._parse_string(
+                transform_prediction_and_target
+            )
+        if isinstance(transform_target, str):
+            transform_target = self._parse_string(transform_target)
+        if isinstance(transform_inference, str):
+            transform_inference = self._parse_string(transform_inference)
+        if isinstance(transform_support, str):
+            transform_support = self._parse_string(transform_support)
+
         self._validate_and_set_transforms(
-            transform_prediction_and_target,
-            transform_target,
-            transform_inference,
-            transform_support,
+            transform_prediction_and_target,  # type: ignore
+            transform_target,  # type: ignore
+            transform_inference,  # type: ignore
+            transform_support,  # type: ignore
         )
 
         # Mapping from last hidden layer to required size of input
@@ -171,7 +186,7 @@ class Task(Model):
         else:
             weights = None
         loss = (
-            self._loss_function(pred, target, weights=weights)
+            self._loss_function(pred, target, weights=weights)  # type: ignore
             + self._regularisation_loss
         )
         return loss
@@ -196,8 +211,8 @@ class Task(Model):
     ) -> None:
         """Validate and set transforms.
 
-        Assert that a valid combination of transformation arguments are passed
-        and update the corresponding functions.
+        Assert that a valid combination of transformation arguments are
+        passed and update the corresponding functions.
         """
         # Checks
         assert not (
@@ -278,8 +293,8 @@ class IdentityTask(Task):
     ):
         """Construct IdentityTask.
 
-        Return the `nb_outputs` as a direct, affine transformation of the last
-        hidden layer.
+        Return the `nb_outputs` as a direct, affine transformation of
+        the last hidden layer.
         """
         self._nb_inputs = nb_outputs
         self._default_target_labels = (

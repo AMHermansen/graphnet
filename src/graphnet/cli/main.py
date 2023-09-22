@@ -10,15 +10,16 @@ from graphnet.models.graphs import *  # noqa: F401
 from graphnet.models.graphs.nodes import *  # noqa: F401
 from graphnet.models.graphs.edges import *  # noqa: F401
 from graphnet.models.task import *  # noqa: F401
+from graphnet.training.loss_functions import *  # noqa: F401
 
 
 def main_cli() -> None:
     """CLI entrypoint of GraphNeT."""
     cli = GraphnetCLI(  # noqa
-        Model,
+        LightweightModel,
         SQLiteDataModule,
-        subclass_mode_model=True,
         seed_everything_default=2023,
+        parser_kwargs={"parser_mode": "omegaconf"},
     )
 
 

@@ -150,7 +150,7 @@ class DynEdge(GNN):
         )
 
         # Base class constructor
-        super().__init__(nb_inputs, self._readout_layer_sizes[-1])
+        super().__init__(nb_inputs, self._readout_layer_sizes)
 
         # Remaining member variables()
         self._activation = torch.nn.LeakyReLU()

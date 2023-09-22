@@ -34,7 +34,7 @@ class ConvNet(GNN):
             dropout_ratio: Fraction of nodes to drop.
         """
         # Base class constructor
-        super().__init__(nb_inputs, nb_outputs)
+        super().__init__(nb_inputs, [nb_outputs])
 
         # Member variables
         self.nb_intermediate = nb_intermediate

@@ -38,6 +38,8 @@ class DynEdgeTITO(GNN):
         features_subset: List[int] = [0, 1, 2, 3],  # noqa
         dyntrans_layer_sizes: Optional[List[Tuple[int, ...]]] = None,
         global_pooling_schemes: List[str] = ["max"],  # noqa
+        post_processing_layer_sizes: Optional[List[int]] = None,
+        readout_layer_size: Optional[List[int]] = None,
     ):
         """Construct `DynEdge`.
 
@@ -46,10 +48,12 @@ class DynEdgeTITO(GNN):
             features_subset: The subset of latent features on each node that
                 are used as metric dimensions when performing the k-nearest
                 neighbours clustering. Defaults to [0,1,2,3].
-            dyntrans_layer_sizes: The layer sizes, or latent feature dimenions,
+            dyntrans_layer_sizes: The layer sizes, or latent feature dimensions,
                 used in the `DynTrans` layer.
             global_pooling_schemes: The list global pooling schemes to use.
                 Options are: "min", "max", "mean", and "sum".
+            readout_layer_size: Readout layer sizes defaults to [256, 128].
+            post_processing_layer_sizes: Post processing MLP defaults to [336, 256].
         """
         # DynEdge layer sizes
         if dyntrans_layer_sizes is None:
@@ -79,7 +83,7 @@ class DynEdgeTITO(GNN):
         self._dyntrans_layer_sizes = dyntrans_layer_sizes
 
         # Post-processing layer sizes
-        post_processing_layer_sizes = [
+        post_processing_layer_sizes = post_processing_layer_sizes or [
             336,
             256,
         ]
@@ -87,7 +91,7 @@ class DynEdgeTITO(GNN):
         self._post_processing_layer_sizes = post_processing_layer_sizes
 
         # Read-out layer sizes
-        readout_layer_sizes = [
+        readout_layer_sizes = readout_layer_size or [
             256,
             128,
         ]
@@ -114,7 +118,7 @@ class DynEdgeTITO(GNN):
         )
 
         # Base class constructor
-        super().__init__(nb_inputs, self._readout_layer_sizes[-1])
+        super().__init__(nb_inputs, self._readout_layer_sizes)
 
         # Remaining member variables()
         self._activation = torch.nn.LeakyReLU()
