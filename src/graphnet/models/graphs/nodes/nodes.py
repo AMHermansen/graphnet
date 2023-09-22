@@ -33,12 +33,13 @@ class NodeDefinition(Model):  # pylint: disable=too-few-public-methods
         return graph
 
     @property
+    @abstractmethod
     def nb_outputs(self) -> int:
         """Return number of output features.
 
-        This the default, but may be overridden by specific inheriting classes.
+        This the default, but may be overridden by specific inheriting
+        classes.
         """
-        return self.nb_inputs
 
     @final
     def set_number_of_inputs(self, node_feature_names: List[str]) -> None:
@@ -68,3 +69,8 @@ class NodesAsPulses(NodeDefinition):
 
     def _construct_nodes(self, x: torch.Tensor) -> Data:
         return Data(x=x)
+
+    @property
+    def nb_outputs(self) -> int:
+        """Return number of outputs."""
+        return self.nb_inputs

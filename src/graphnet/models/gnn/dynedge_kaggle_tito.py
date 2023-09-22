@@ -35,9 +35,9 @@ class DynEdgeTITO(GNN):
     def __init__(
         self,
         nb_inputs: int,
-        features_subset: slice = slice(0, 4),
+        features_subset: List[int] = [0, 1, 2, 3],  # noqa
         dyntrans_layer_sizes: Optional[List[Tuple[int, ...]]] = None,
-        global_pooling_schemes: List[str] = ["max"],
+        global_pooling_schemes: List[str] = ["max"],  # noqa
     ):
         """Construct `DynEdge`.
 

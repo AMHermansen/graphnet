@@ -407,8 +407,8 @@ Below is a snippet that defines a `Model` that reconstructs the zenith angle wit
 ```python
 # Choice of graph representation, GNN architecture, and physics task
 from graphnet.models.detector.prometheus import Prometheus
-from graphnet.models.graphs  import  KNNGraph
-from graphnet.models.graphs.nodes  import  NodesAsPulses
+from graphnet.models.graphs import KNNGraph
+from graphnet.models.graphs.nodes import NodesAsPulses
 from graphnet.models.gnn.dynedge import DynEdge
 from graphnet.models.task.reconstruction import ZenithReconstructionWithKappa
 
@@ -423,9 +423,9 @@ from graphnet.models import StandardModel
 # edges drawn to the 8 nearest neighbours 
 
 graph_definition = KNNGraph(
-	detector=Prometheus(),
-	node_definition=NodesAsPulses(),
-	nb_nearest_neighbours=8,
+    detector=Prometheus(),
+    node_definition=NodesAsPulses(),
+    nb_nearest_neighbours=8,
 )
 gnn = DynEdge(
     nb_inputs=detector.nb_outputs,

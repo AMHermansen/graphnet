@@ -13,7 +13,8 @@ from graphnet.utilities.config import save_model_config
 class MircoSummaryNodes(NodeDefinition):
     """Create summary variables for times and charges per dom.
 
-    Summary variables are inspired by https://arxiv.org/pdf/2101.11589.pdf.
+    Summary variables are inspired by
+    https://arxiv.org/pdf/2101.11589.pdf.
     """
 
     _x_index = 0
@@ -25,10 +26,13 @@ class MircoSummaryNodes(NodeDefinition):
     _second_time_index = 500 / 3.0e4
     _charge_scale = 2
     _charge_quantile_times = np.array([0.2, 0.5])
-
     _generated_features = 9 + len(_charge_quantile_times)
 
-    @save_model_config
+    @property
+    def nb_outputs(self) -> int:
+        """Return number of outputs."""
+        return self._generated_features
+
     def __init__(
         self,
         times: Optional[List[float]] = None,
@@ -45,7 +49,7 @@ class MircoSummaryNodes(NodeDefinition):
             index_permutation: temp
             **kwargs:
         """
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # noqa
         self.times = times
         self.time_quantiles = time_quantiles
         if dom_specifiers is None:
@@ -108,7 +112,7 @@ class MircoSummaryNodes(NodeDefinition):
                     ],
                 ]
             )
-        pass
+        return Data(x=torch.from_numpy(summary_data))
 
     def _split_pulsemap_to_doms(self, x: torch.Tensor) -> Any:
         x = x.numpy()

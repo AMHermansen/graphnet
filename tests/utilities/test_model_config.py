@@ -52,7 +52,7 @@ def test_complete_model_config(path: str = "/tmp/complete_model.yml") -> None:
         node_feature_names=FEATURES.DEEPCORE,
     )
     gnn = DynEdge(
-        nb_inputs=graph_definition.nb_outputs,
+        nb_inputs=graph_definition._nb_outputs,
         global_pooling_schemes=["min", "max", "mean", "sum"],
     )
     task = EnergyReconstruction(

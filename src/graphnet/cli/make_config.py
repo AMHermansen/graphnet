@@ -1,8 +1,6 @@
-"""GraphNeT CLI Entrypoint."""
-from graphnet.cli.graphnet_cli import GraphnetCLI
-from graphnet.models import LightweightModel
-from graphnet.data import SQLiteDataModule
+"""Script to make config templates."""
 from graphnet.models import Model
+from lightning.pytorch.cli import LightningCLI
 
 from graphnet.models import *  # noqa: F401
 from graphnet.models.gnn import *  # noqa: F401
@@ -12,15 +10,13 @@ from graphnet.models.graphs.edges import *  # noqa: F401
 from graphnet.models.task import *  # noqa: F401
 
 
-def main_cli() -> None:
+def config_cli() -> None:
     """CLI entrypoint of GraphNeT."""
-    cli = GraphnetCLI(  # noqa
+    cli = LightningCLI(  # noqa
         Model,
-        SQLiteDataModule,
         subclass_mode_model=True,
-        seed_everything_default=2023,
     )
 
 
 if __name__ == "__main__:":
-    main_cli()  # type ignore
+    config_cli()  # type ignore

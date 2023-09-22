@@ -15,13 +15,13 @@ from graphnet.models.graphs.nodes import NodesAsPulses
 def test_transform_prediction_and_target() -> None:
     """Test implementation of `transform_*` arguments to `Task`."""
     graph_definition = KNNGraph(
-        detector=IceCube86(),
+        detector=IceCube86(),  # noqa
         node_definition=NodesAsPulses(),
         nb_nearest_neighbours=8,
         node_feature_names=FEATURES.DEEPCORE,
     )
     gnn = DynEdge(
-        nb_inputs=graph_definition.nb_outputs,
+        nb_inputs=graph_definition._nb_outputs,
     )
 
     # Test not inverse functions

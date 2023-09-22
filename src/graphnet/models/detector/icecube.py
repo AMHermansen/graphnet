@@ -9,6 +9,34 @@ from graphnet.models.detector.detector import Detector
 class IceCube86(Detector):
     """`Detector` class for IceCube-86."""
 
+    def __init__(
+        self,
+        pmt_scaling: float = 0.05,
+        rde_scaling: float = 0.25,
+        rde_offset: float = 1.25,
+        time_scaling: float = 3.0e4,
+        time_offset: float = 1.0e04,
+        space_scaling: float = 500.0,
+    ):
+        """Construct IceCube86 detector.
+
+        Args:
+            pmt_scaling: Scaling for pmt_area.
+            rde_scaling: Scaling for rde.
+            rde_offset: Offset for rde.
+            time_scaling: Scaling for time.
+            time_offset: Offset for time.
+            space_scaling: Scaling for all space coordinates.
+        """
+        super().__init__()
+
+        self._space_scaling = space_scaling
+        self._time_offset = time_offset
+        self._time_scaling = time_scaling
+        self._rde_offset = rde_offset
+        self._rde_scaling = rde_scaling
+        self._pmt_scaling = pmt_scaling
+
     def feature_map(self) -> Dict[str, Callable]:
         """Map standardization functions to each dimension of input data."""
         feature_map = {
@@ -23,19 +51,19 @@ class IceCube86(Detector):
         return feature_map
 
     def _dom_xyz(self, x: torch.tensor) -> torch.tensor:
-        return x / 500.0
+        return x / self._space_scaling
 
     def _dom_time(self, x: torch.tensor) -> torch.tensor:
-        return (x - 1.0e04) / 3.0e4
+        return (x - self._time_offset) / self._time_scaling
 
     def _charge(self, x: torch.tensor) -> torch.tensor:
         return torch.log10(x)
 
     def _rde(self, x: torch.tensor) -> torch.tensor:
-        return (x - 1.25) / 0.25
+        return (x - self._rde_offset) / self._rde_scaling
 
     def _pmt_area(self, x: torch.tensor) -> torch.tensor:
-        return x / 0.05
+        return x / self._pmt_scaling
 
 
 class IceCubeKaggle(Detector):

@@ -54,6 +54,7 @@ EXTRAS_REQUIRE = {
         "torch-geometric>=2.1",
         "lightning[extra]>=2.0",
         "torchmetrics[visual]",
+        "lion_pytorch",
     ],
 }
 
@@ -96,6 +97,9 @@ setup(
     extras_require=EXTRAS_REQUIRE,
     classifiers=CLASSIFIERS,
     entry_points={
-        "console_scripts": ["graphnet = graphnet.cli.main:main_cli"]
+        "console_scripts": [
+            "graphnet = graphnet.cli.main:main_cli",
+            "graphnet-conf = graphnet.cli.make_config:config_cli",
+        ]
     },
 )

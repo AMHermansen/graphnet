@@ -1,6 +1,6 @@
 """Standard model class(es)."""
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Type
 
 import numpy as np
 import torch
@@ -35,7 +35,7 @@ class StandardModel(Model):
         graph_definition: GraphDefinition,
         gnn: GNN,
         tasks: Union[Task, List[Task]],
-        optimizer_class: type = Adam,
+        optimizer_class: Type[torch.optim.optimizer] = Adam,
         optimizer_kwargs: Optional[Dict] = None,
         scheduler_class: Optional[type] = None,
         scheduler_kwargs: Optional[Dict] = None,
@@ -89,12 +89,15 @@ class StandardModel(Model):
             accelerator=accelerator,
             devices=devices,
             max_epochs=max_epochs,
-            callbacks=callbacks,
+            callbacks=callbacks[  # type: ignore
+                1:
+            ],  # Earlystopping passed twice  TODO only pass once.
             log_every_n_steps=log_every_n_steps,
             logger=logger,
             gradient_clip_val=gradient_clip_val,
             strategy=distribution_strategy,
             default_root_dir=ckpt_path,
+            precision="16-mixed",
             **trainer_kwargs,
         )
 
@@ -231,7 +234,7 @@ class StandardModel(Model):
     ) -> Tensor:
         """Compute and sum losses across tasks."""
         losses = [
-            task._compute_loss(pred, data)
+            task.compute_loss(pred, data)
             for task, pred in zip(self._tasks, preds)
         ]
         if verbose:

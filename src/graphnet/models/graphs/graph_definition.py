@@ -63,8 +63,8 @@ class GraphDefinition(Model):
         self._node_definition.set_number_of_inputs(
             node_feature_names=node_feature_names
         )
-        self.nb_inputs = len(self._node_feature_names)
-        self.nb_outputs = self._node_definition.nb_outputs
+        self._nb_inputs = len(self._node_feature_names)
+        self._nb_outputs = self._node_definition.nb_outputs
 
     def forward(  # type: ignore
         self,
@@ -264,3 +264,13 @@ class GraphDefinition(Model):
         for key, fn in custom_label_functions.items():
             graph[key] = fn(graph)
         return graph
+
+    @property
+    def nb_outputs(self) -> int:
+        """Return number of outputs."""
+        return self._nb_outputs
+
+    @property
+    def nb_inputs(self) -> int:
+        """Return number of inputs."""
+        return self._nb_inputs

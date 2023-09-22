@@ -8,5 +8,5 @@ between nodes and their features.
 
 from .graph_definition import GraphDefinition
 from .graphs import KNNGraph
-from .nodes import NodeDefinition, NodesAsPulses
-from .edges import EdgeDefinition, EuclideanEdges, KNNEdges, RadialEdges
+from .nodes import *
+from .edges import *

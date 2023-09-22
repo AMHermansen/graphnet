@@ -2,3 +2,4 @@
 
 from .icecube import IceCube86, IceCubeDeepCore
 from .detector import Detector
+from .prometheus import Prometheus

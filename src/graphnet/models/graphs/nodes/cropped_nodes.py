@@ -12,11 +12,15 @@ from graphnet.utilities.config import save_model_config
 class PulsesCroppedValue(NodeDefinition):
     """Represent each node as pulse with an upper limit of nodes."""
 
-    @save_model_config
+    @property
+    def nb_outputs(self) -> int:
+        """Return number of outputs."""
+        return self.nb_inputs
+
     def __init__(
         self,
         max_pulses: int,
-        transform: Callable[[torch.Tensor], torch.Tensor] = nn.Identity(),
+        transform: Callable[[torch.Tensor], torch.Tensor] = None,
         **kwargs: Any,
     ):
         """Construct `PulsesCroppedByCharge`.".
@@ -29,7 +33,8 @@ class PulsesCroppedValue(NodeDefinition):
              transform: Transform applied to the input tensor, before determining order.
             **kwargs: kwargs passed to NodeDefinitions constructor.
         """
-        super().__init__(**kwargs)
+        transform = transform or nn.Identity()
+        super().__init__(**kwargs)  # noqa
         self.max_pulses = max_pulses
         self.transform = transform
 
@@ -48,7 +53,11 @@ class PulsesCroppedValue(NodeDefinition):
 class PulsesCroppedRandomly(NodeDefinition):
     """Represent each node as pulse with an upper limit of nodes."""
 
-    @save_model_config
+    @property
+    def nb_outputs(self) -> int:
+        """Return number of outputs."""
+        return self.nb_inputs
+
     def __init__(self, max_pulses: int, **kwargs: Any):
         """Construct 'PulsesCroppedRandomly'.
 
@@ -58,7 +67,7 @@ class PulsesCroppedRandomly(NodeDefinition):
             max_pulses: Maximal number of pulses allowed in the pulsemap.
             **kwargs: kwargs passed to NodeDefinitions constructor.
         """
-        super().__init__(**kwargs)
+        super().__init__(**kwargs)  # noqa
         self.max_pulses = max_pulses
 
     def _construct_nodes(self, x: torch.tensor) -> Data:
