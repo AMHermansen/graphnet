@@ -35,7 +35,7 @@ class StandardModel(Model):
         graph_definition: GraphDefinition,
         gnn: GNN,
         tasks: Union[Task, List[Task]],
-        optimizer_class: Type[torch.optim.optimizer] = Adam,
+        optimizer_class: Type[torch.optim.Optimizer] = Adam,
         optimizer_kwargs: Optional[Dict] = None,
         scheduler_class: Optional[type] = None,
         scheduler_kwargs: Optional[Dict] = None,
