@@ -1,7 +1,7 @@
 """Collection of loss functions.
 
-All loss functions inherit from `LossFunction` which ensures a common syntax,
-handles per-event weights, etc.
+All loss functions inherit from `LossFunction` which ensures a common
+syntax, handles per-event weights, etc.
 """
 
 from abc import abstractmethod
@@ -53,10 +53,10 @@ class LossFunction(Model):
         elements = self._forward(prediction, target)
         if weights is not None:
             elements = elements * weights
+
         assert elements.size(dim=0) == target.size(
             dim=0
         ), "`_forward` should return elementwise loss terms."
-
         return elements if return_elements else torch.mean(elements)
 
     @abstractmethod
@@ -101,7 +101,7 @@ class LogCoshLoss(LossFunction):
         Used to avoid `inf` for even moderately large differences.
         See [https://github.com/keras-team/keras/blob/v2.6.0/keras/losses.py#L1580-L1617]
         """
-        return x + softplus(-2.0 * x) - np.log(2.0)
+        return x + softplus(-2.0 * x)
 
     def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
         """Implement loss calculation."""
@@ -120,15 +120,16 @@ class CrossEntropyLoss(LossFunction):
 
     def __init__(
         self,
-        options: Union[int, List[Any], Dict[Any, int]],
-        *args: Any,
+        options: Union[int, List[Any], Dict[Any, int], str],
         **kwargs: Any,
     ):
         """Construct CrossEntropyLoss."""
         # Base class constructor
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         # Member variables
+        if isinstance(options, str):
+            options = self._unsafe_parse_string(options)
         self._options = options
         self._nb_classes: int
         if isinstance(self._options, int):
@@ -151,7 +152,10 @@ class CrossEntropyLoss(LossFunction):
         self._loss = nn.CrossEntropyLoss(reduction="none")
 
     def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
-        """Transform outputs to angle and prepare prediction."""
+        """Compute element wise losses.
+
+        Might get reduced later.
+        """
         if isinstance(self._options, int):
             # Integer number of classes: Targets are expected to be in
             # (0, nb_classes - 1).
@@ -180,24 +184,27 @@ class CrossEntropyLoss(LossFunction):
             #     Given options: {1: 0, -1: 0, 12: 1, -12: 1, ...}
             #     Yields: [1, -1, -12, ...] -> [0, 0, 1, ...]
             target_integer = torch.tensor(
-                [self._options[int(value)] for value in target]
-            )
+                [self._options[int(value)] for value in target],
+                device=target.device,
+            ).to(torch.int64)
 
         else:
-            assert False, "Shouldn't reach here."
+            self.critical(
+                f"Unexpected type of options detected: {type(self._options) = }"
+                f"terminating program."
+            )
+            raise ValueError("Unknown type for option.")
 
-        target_one_hot: Tensor = one_hot(target_integer, self._nb_classes).to(
-            prediction.device
+        return self._loss(
+            prediction.float().to("cpu"), target_integer.to("cpu")
         )
-
-        return self._loss(prediction.float(), target_one_hot.float())
 
 
 class BinaryCrossEntropyLoss(LossFunction):
     """Compute binary cross entropy loss.
 
-    Predictions are vector probabilities (i.e., values between 0 and 1), and
-    targets should be 0 and 1.
+    Predictions are vector probabilities (i.e., values between 0 and 1),
+    and targets should be 0 and 1.
     """
 
     def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
@@ -279,8 +286,8 @@ class LogCMK(torch.autograd.Function):
 class VonMisesFisherLoss(LossFunction):
     """General class for calculating von Mises-Fisher loss.
 
-    Requires implementation for specific dimension `m` in which the target and
-    prediction vectors need to be prepared.
+    Requires implementation for specific dimension `m` in which the
+    target and prediction vectors need to be prepared.
     """
 
     @classmethod
@@ -296,7 +303,8 @@ class VonMisesFisherLoss(LossFunction):
     ) -> Tensor:  # pylint: disable=invalid-name
         """Calculate $log C_{m}(k)$ term in von Mises-Fisher loss approx.
 
-        [https://arxiv.org/abs/1812.04616] Sec. 8.2 with additional minus sign.
+        [https://arxiv.org/abs/1812.04616] Sec. 8.2 with additional
+        minus sign.
         """
         v = m / 2.0 - 0.5
         a = torch.sqrt((v + 1) ** 2 + kappa**2)
@@ -309,10 +317,10 @@ class VonMisesFisherLoss(LossFunction):
     ) -> Tensor:  # pylint: disable=invalid-name
         """Calculate $log C_{m}(k)$ term in von Mises-Fisher loss.
 
-        Since `log_cmk_exact` is diverges for `kappa` >~ 700 (using float64
-        precision), and since `log_cmk_approx` is unaccurate for small `kappa`,
-        this method automatically switches between the two at `kappa_switch`,
-        ensuring continuity at this point.
+        Since `log_cmk_exact` is diverges for `kappa` >~ 700 (using
+        float64 precision), and since `log_cmk_approx` is unaccurate for
+        small `kappa`, this method automatically switches between the
+        two at `kappa_switch`, ensuring continuity at this point.
         """
         kappa_switch = torch.tensor([kappa_switch]).to(kappa.device)
         mask_exact = kappa < kappa_switch

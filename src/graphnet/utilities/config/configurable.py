@@ -39,7 +39,7 @@ class Configurable(ABC):
         """Construct instance from `source` configuration."""
 
     @staticmethod
-    def _parse_string(s: str) -> Any:
+    def _unsafe_parse_string(s: str) -> Any:
         if not isinstance(s, str):
             raise ValueError("Can only parse strings")
         if s[0] == "!":

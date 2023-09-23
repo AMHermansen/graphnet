@@ -26,7 +26,7 @@ class GraphDefinition(Model):
         node_definition: NodeDefinition,
         edge_definition: Optional[EdgeDefinition] = None,
         node_feature_names: Optional[List[str]] = None,
-        # dtype: Optional[torch.dtype] = torch.float32,
+        dtype: Optional[torch.dtype] = torch.float32,
     ):
         """Construct ´GraphDefinition´. The ´detector´ holds.
 

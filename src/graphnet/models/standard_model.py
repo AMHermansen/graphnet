@@ -14,7 +14,7 @@ from torch_geometric.data import Data
 import pandas as pd
 from lightning.pytorch.loggers.logger import Logger as LightningLogger
 
-from graphnet.training.callbacks import ProgressBar
+from graphnet.training.callbacks import GNProgressBar
 from graphnet.models.graphs import GraphDefinition
 from graphnet.models.gnn.gnn import GNN
 from graphnet.models.model import Model
@@ -386,7 +386,7 @@ class StandardModel(Model):
         return results
 
     def _create_default_callbacks(self, val_dataloader: DataLoader) -> List:
-        callbacks = [ProgressBar()]
+        callbacks = [GNProgressBar()]
         callbacks = self._add_early_stopping(
             val_dataloader=val_dataloader, callbacks=callbacks
         )

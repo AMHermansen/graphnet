@@ -98,8 +98,7 @@ setup(
     classifiers=CLASSIFIERS,
     entry_points={
         "console_scripts": [
-            "graphnet = graphnet.cli.main:main_cli",
-            "graphnet-conf = graphnet.cli.make_config:config_cli",
+            "gn = graphnet.cli.main:main_cli",
         ]
     },
 )

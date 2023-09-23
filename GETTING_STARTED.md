@@ -553,9 +553,9 @@ You can therefore choose to write your own custom training loops if needed, or u
 The snippet above is equivalent to:
 
 ```python
-from  pytorch_lightning import Trainer
+from pytorch_lightning import Trainer
 
-from  graphnet.training.callbacks import ProgressBar
+from graphnet.training.callbacks import GNProgressBar
 
 model = Model(...)
 train_dataloader = DataLoader(...)
@@ -564,7 +564,7 @@ train_dataloader = DataLoader(...)
 trainer = Trainer(
     gpus=None,
     max_epochs=10,
-    callbacks=[ProgressBar()],
+    callbacks=[GNProgressBar()],
     log_every_n_steps=1,
     logger=None,
     strategy="ddp",

@@ -19,7 +19,7 @@ from graphnet.models.task.reconstruction import (
     DirectionReconstructionWithKappa,
 )
 from graphnet.training.labels import Direction
-from graphnet.training.callbacks import ProgressBar
+from graphnet.training.callbacks import GNProgressBar
 from graphnet.training.loss_functions import VonMisesFisher3DLoss
 from graphnet.training.utils import make_train_validation_dataloader
 from graphnet.utilities.argparse import ArgumentParser
@@ -115,7 +115,7 @@ def main(
     gnn = DynEdgeTITO(
         nb_inputs=graph_definition.nb_outputs,
         global_pooling_schemes=["max"],
-        dyntrans_layer_sizes=DYNTRANS_LAYER_SIZES,
+        dyntrans_layer_sizes=DYNTRANS_LAYER_SIZES,  # type: ignore
     )
     task = DirectionReconstructionWithKappa(
         hidden_size=gnn.nb_outputs,
@@ -144,7 +144,7 @@ def main(
             monitor="val_loss",
             patience=config["early_stopping_patience"],
         ),
-        ProgressBar(),
+        GNProgressBar(),
     ]
 
     model.fit(

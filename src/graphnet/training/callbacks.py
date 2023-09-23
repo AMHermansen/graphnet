@@ -78,7 +78,7 @@ class PiecewiseLinearLR(LRScheduler):
         return [base_lr * self._get_factor() for base_lr in self.base_lrs]
 
 
-class ProgressBar(TQDMProgressBar):
+class GNProgressBar(TQDMProgressBar):
     """Custom progress bar for graphnet.
 
     Customises the default progress in pytorch-lightning.
@@ -124,9 +124,10 @@ class ProgressBar(TQDMProgressBar):
     ) -> None:
         """Print the results of the previous epoch on a separate line.
 
-        This allows the user to see the losses/metrics for previous epochs
-        while the current is training. The default behaviour in pytorch-
-        lightning is to overwrite the progress bar from previous epochs.
+        This allows the user to see the losses/metrics for previous
+        epochs while the current is training. The default behaviour in
+        pytorch- lightning is to overwrite the progress bar from
+        previous epochs.
         """
         if trainer.current_epoch > 0:
             self.train_progress_bar.set_postfix(
@@ -238,7 +239,9 @@ class WriteValToParquet(Callback):
     def _write_to_cache(
         self, outputs: Any, batch: Batch, model: LightweightModel
     ) -> None:
-        for idx, pred_label in enumerate(model.prediction_labels):
+        outputs = outputs["preds"][0]
+        for idx, pred_label in enumerate(chain(model.prediction_labels)):
+            # print(idx, pred_label, outputs)
             self._cache[pred_label] += outputs[:, idx].tolist()
         for idx, attribute in enumerate(self._additional_attributes):
             self._cache[attribute].extend(batch[attribute])

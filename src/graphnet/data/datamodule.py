@@ -86,8 +86,6 @@ class SQLiteDataModule(Logger, LightningDataModule):
                 for k, v in selection.items()
             }
 
-        self._selection = selection
-
         self._db = self._convert_to_dict(db, str)
         self._pulsemaps = pulsemaps
         self._graph_definition = graph_definition
@@ -132,6 +130,7 @@ class SQLiteDataModule(Logger, LightningDataModule):
         assert "val" in self._all_keys
 
         self.save_hyperparameters(ignore=["graph_definition"])
+        self._selection = selection
 
     @staticmethod
     def _convert_to_dict(input_value: Any, value_type: type) -> Dict[str, Any]:

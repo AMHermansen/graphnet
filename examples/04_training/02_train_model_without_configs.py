@@ -16,7 +16,7 @@ from graphnet.models.gnn import DynEdge
 from graphnet.models.graphs import KNNGraph
 from graphnet.models.graphs.nodes import NodesAsPulses
 from graphnet.models.task.reconstruction import EnergyReconstruction
-from graphnet.training.callbacks import ProgressBar, PiecewiseLinearLR
+from graphnet.training.callbacks import GNProgressBar, PiecewiseLinearLR
 from graphnet.training.loss_functions import LogCoshLoss
 from graphnet.training.utils import make_train_validation_dataloader
 from graphnet.utilities.argparse import ArgumentParser
@@ -140,7 +140,7 @@ def main(
             monitor="val_loss",
             patience=config["early_stopping_patience"],
         ),
-        ProgressBar(),
+        GNProgressBar(),
     ]
 
     model.fit(

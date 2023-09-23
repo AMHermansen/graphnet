@@ -107,7 +107,7 @@ class Task(Model):
             prediction_labels = [prediction_labels]
 
         if isinstance(loss_function, str):
-            loss_function = self._parse_string(loss_function)
+            loss_function = self._unsafe_parse_string(loss_function)
 
         assert isinstance(target_labels, List)  # mypy
         assert isinstance(prediction_labels, List)  # mypy
@@ -128,15 +128,17 @@ class Task(Model):
         self._transform_target: Callable[[Tensor], Tensor] = lambda x: x
 
         if isinstance(transform_prediction_and_target, str):
-            transform_prediction_and_target = self._parse_string(
+            transform_prediction_and_target = self._unsafe_parse_string(
                 transform_prediction_and_target
             )
         if isinstance(transform_target, str):
-            transform_target = self._parse_string(transform_target)
+            transform_target = self._unsafe_parse_string(transform_target)
         if isinstance(transform_inference, str):
-            transform_inference = self._parse_string(transform_inference)
+            transform_inference = self._unsafe_parse_string(
+                transform_inference
+            )
         if isinstance(transform_support, str):
-            transform_support = self._parse_string(transform_support)
+            transform_support = self._unsafe_parse_string(transform_support)
 
         self._validate_and_set_transforms(
             transform_prediction_and_target,  # type: ignore
@@ -189,6 +191,7 @@ class Task(Model):
             self._loss_function(pred, target, weights=weights)  # type: ignore
             + self._regularisation_loss
         )
+
         return loss
 
     @final
@@ -303,7 +306,7 @@ class IdentityTask(Task):
             else [target_labels]
         )
         self._default_prediction_labels = [
-            f"target_{i}_pred" for i in range(len(self._default_target_labels))
+            f"target_{i}_pred" for i in range(nb_outputs)
         ]
 
         super().__init__(*args, **kwargs)

@@ -9,7 +9,7 @@ from pytorch_lightning.utilities import rank_zero_only
 from graphnet.constants import EXAMPLE_OUTPUT_DIR
 from graphnet.data.dataloader import DataLoader
 from graphnet.models import StandardModel
-from graphnet.training.callbacks import ProgressBar
+from graphnet.training.callbacks import GNProgressBar
 from graphnet.utilities.argparse import ArgumentParser
 from graphnet.utilities.config import (
     DatasetConfig,
@@ -90,7 +90,7 @@ def main(
             monitor="val_loss",
             patience=config.early_stopping_patience,
         ),
-        ProgressBar(),
+        GNProgressBar(),
     ]
 
     model.fit(

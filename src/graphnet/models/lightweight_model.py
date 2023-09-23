@@ -31,6 +31,7 @@ class LightweightModel(Model):
         scheduler_class: Optional[type] = None,
         scheduler_kwargs: Optional[Dict] = None,
         scheduler_config: Optional[Dict] = None,
+        state_dict_path: Optional[str] = "",
     ) -> None:
         """Construct lightweight lightning model.
 
@@ -43,6 +44,7 @@ class LightweightModel(Model):
             scheduler_class: Learning rate scheduler for the optimizer.
             scheduler_kwargs: Scheduler keyword-args.
             scheduler_config: Remaining config for scheduler.
+            state_dict_path: Path to state_dict_path to load the model weights.
         """
         # Base class constructor
         super().__init__(name=__name__, class_name=self.__class__.__name__)
@@ -63,6 +65,11 @@ class LightweightModel(Model):
         self._scheduler_class = scheduler_class
         self._scheduler_kwargs = scheduler_kwargs or dict()
         self._scheduler_config = scheduler_config or dict()
+
+        if state_dict_path:
+            self.load_state_dict(state_dict_path)
+
+        self._gnn.type(self._graph_definition._dtype)
 
     @property
     def target_labels(self) -> List[str]:
@@ -131,22 +138,24 @@ class LightweightModel(Model):
         )
         return {"loss": loss, "preds": preds}
 
-    def _shared_step(self, batch: Data, batch_idx: int) -> Tensor:
+    def _shared_step(
+        self, batch: Data, batch_idx: int
+    ) -> List[Union[Tensor, Data]]:
         """Perform shared step.
 
         Applies the forward pass and the following loss calculation,
         shared between the training and validation step.
         """
         preds = self._gnn(batch)  # noqa
-
-        return preds
+        out = [task(preds) for task in self._tasks]
+        return out
 
     def _compute_loss(
         self, preds: Tensor, data: Data, verbose: bool = False
     ) -> Tensor:
         """Compute and sum losses across tasks."""
         losses = [
-            task._compute_loss(pred, data)
+            task.compute_loss(pred, data)
             for task, pred in zip(self._tasks, preds)
         ]
         if verbose:
