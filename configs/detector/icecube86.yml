@@ -1,0 +1,9 @@
+detector:
+  class_path: graphnet.models.detector.IceCube86
+  init_args:
+    pmt_scaling: 0.05
+    rde_scaling: 0.25
+    rde_offset: 1.25
+    time_scaling: 30000.0
+    time_offset: 10000.0
+    space_scaling: 500.0

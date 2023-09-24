@@ -16,7 +16,8 @@ from graphnet.models.gnn import DynEdge
 from graphnet.models.graphs import KNNGraph
 from graphnet.models.graphs.nodes import NodesAsPulses
 from graphnet.models.task.reconstruction import EnergyReconstruction
-from graphnet.training.callbacks import GNProgressBar, PiecewiseLinearLR
+from graphnet.training.callbacks import GNProgressBar
+from graphnet.training.scheduler import PiecewiseLinearLR
 from graphnet.training.loss_functions import LogCoshLoss
 from graphnet.training.utils import make_train_validation_dataloader
 from graphnet.utilities.argparse import ArgumentParser

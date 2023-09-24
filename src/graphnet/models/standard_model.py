@@ -97,7 +97,7 @@ class StandardModel(Model):
             gradient_clip_val=gradient_clip_val,
             strategy=distribution_strategy,
             default_root_dir=ckpt_path,
-            precision="16-mixed",
+            # precision="16-mixed",
             **trainer_kwargs,
         )
 

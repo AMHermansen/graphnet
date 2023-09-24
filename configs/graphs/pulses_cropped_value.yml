@@ -1,0 +1,5 @@
+node_definition:
+  class_path: graphnet.models.graphs.PulsesCroppedValue
+  init_args:
+    max_pulses: null
+    transform: null

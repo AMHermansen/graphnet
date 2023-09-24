@@ -1,0 +1,10 @@
+gnn:
+  class_path: graphnet.models.gnn.ODynEdge
+  init_args:
+    nb_neighbours: 8
+    features_subset: null
+    dynedge_layer_sizes: null
+    post_processing_layer_sizes: null
+    readout_layer_sizes: null
+    global_pooling_schemes: null
+    add_global_variables_after_pooling: false

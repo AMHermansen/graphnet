@@ -46,5 +46,4 @@ class GraphnetCLI(LightningCLI):
             "gnn.nb_outputs",
             "tasks.init_args.hidden_size",
             apply_on="instantiate",
-            # compute_fn=_find_output_size_from_list,
         )

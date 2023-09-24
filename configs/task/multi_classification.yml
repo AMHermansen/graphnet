@@ -1,0 +1,13 @@
+task:
+  class_path: graphnet.models.task.MulticlassClassificationTask
+  init_args:
+    prediction_labels: null
+    nb_outputs: null
+    target_labels: null
+    loss_function: null
+    additional_metrics: null
+    transform_prediction_and_target: null
+    transform_target: null
+    transform_inference: null
+    transform_support: null
+    loss_weight: null

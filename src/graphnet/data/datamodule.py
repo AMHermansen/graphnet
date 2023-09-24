@@ -75,14 +75,16 @@ class SQLiteDataModule(Logger, LightningDataModule):
 
         if isinstance(selection, Sequence) and isinstance(selection[0], str):
             selection = {
-                k: np.genfromtxt(selection_path, dtype=np.int32).tolist()
+                k: np.genfromtxt(
+                    selection_path, dtype=np.int32, skip_header=1
+                ).tolist()
                 for selection_path, k in zip(
                     selection, ["train", "val", "test"]
                 )
             }
         if isinstance(selection, Dict) and isinstance(selection["train"], str):
             selection = {
-                k: np.genfromtxt(v, dtype=np.int32).tolist()
+                k: np.genfromtxt(v, dtype=np.int32, skip_header=1).tolist()
                 for k, v in selection.items()
             }
 
@@ -120,6 +122,9 @@ class SQLiteDataModule(Logger, LightningDataModule):
             labels=self._labels,
         )
 
+        self.save_hyperparameters(ignore=["graph_definition"])
+        self._selection = selection
+
         self._all_keys = self._get_unique_keys(
             self._batch_size, self._selection, self._num_workers, self._db  # type: ignore
         )
@@ -128,9 +133,6 @@ class SQLiteDataModule(Logger, LightningDataModule):
         assert all(key in ["test", "val", "train"] for key in self._all_keys)
         assert "train" in self._all_keys
         assert "val" in self._all_keys
-
-        self.save_hyperparameters(ignore=["graph_definition"])
-        self._selection = selection
 
     @staticmethod
     def _convert_to_dict(input_value: Any, value_type: type) -> Dict[str, Any]:

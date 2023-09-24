@@ -1,0 +1,8 @@
+graph_definition:
+  class_path: graphnet.models.graphs.GraphDefinition
+  init_args:
+    detector: null
+    node_definition: null
+    edge_definition: null
+    node_feature_names: null
+    dtype: torch.float32

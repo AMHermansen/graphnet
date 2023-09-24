@@ -2,12 +2,9 @@
 
 import logging
 import os
-from collections.abc import Sequence
 from itertools import chain
-from typing import Dict, List, Optional, Any, Union
-import warnings
+from typing import Dict, List, Optional, Any
 
-import numpy as np
 import pandas as pd
 from torch_geometric.data import Batch
 from tqdm.std import Bar
@@ -15,67 +12,9 @@ from tqdm.std import Bar
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import TQDMProgressBar, Callback
 from lightning.pytorch.utilities import rank_zero_only
-from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler
 
 from graphnet.models.lightweight_model import LightweightModel
 from graphnet.utilities.logging import Logger
-
-
-class PiecewiseLinearLR(LRScheduler):
-    """Interpolate learning rate linearly between milestones."""
-
-    def __init__(
-        self,
-        optimizer: Optimizer,
-        milestones: List[int],
-        factors: List[float],
-        last_epoch: int = -1,
-        verbose: bool = False,
-    ):
-        """Construct `PiecewiseLinearLR`.
-
-        For each milestone, denoting a specified number of steps, a factor
-        multiplying the base learning rate is specified. For steps between two
-        milestones, the learning rate is interpolated linearly between the two
-        closest milestones. For steps before the first milestone, the factor
-        for the first milestone is used; vice versa for steps after the last
-        milestone.
-
-        Args:
-            optimizer: Wrapped optimizer.
-            milestones: List of step indices. Must be increasing.
-            factors: List of multiplicative factors. Must be same length as
-                `milestones`.
-            last_epoch: The index of the last epoch.
-            verbose: If ``True``, prints a message to stdout for each update.
-        """
-        # Check(s)
-        if milestones != sorted(milestones):
-            raise ValueError("Milestones must be increasing")
-        if len(milestones) != len(factors):
-            raise ValueError(
-                "Only multiplicative factor must be specified for each milestone."
-            )
-
-        self.milestones = milestones
-        self.factors = factors
-        super().__init__(optimizer, last_epoch, verbose)
-
-    def _get_factor(self) -> np.ndarray:
-        # Linearly interpolate multiplicative factor between milestones.
-        return np.interp(self.last_epoch, self.milestones, self.factors)
-
-    def get_lr(self) -> List[float]:
-        """Get effective learning rate(s) for each optimizer."""
-        if not self._get_lr_called_within_step:
-            warnings.warn(
-                "To get the last learning rate computed by the scheduler, "
-                "please use `get_last_lr()`.",
-                UserWarning,
-            )
-
-        return [base_lr * self._get_factor() for base_lr in self.base_lrs]
 
 
 class GNProgressBar(TQDMProgressBar):
@@ -169,21 +108,28 @@ class WriteValToParquet(Callback):
     def __init__(
         self,
         output_dir: str,
+        results_folder: str = "results",
         output_file_prefix: str = "validation_result",
         additional_attributes: Optional[List[str]] = None,
         prediction_labels: Optional[List[str]] = None,
         val_epoch_frequency: int = 1,
+        overwrite_results_folder: bool = False,
     ):
         """Construct ´WriteValToParquet´ callback to store val results.
 
         Args:
             output_dir: Directory of parquet files.
+            results_folder: Folder inside outdir to store results.
             output_file_prefix: Prefix in output_files.
             additional_attributes: Additional attributes to extract.
             prediction_labels: Labels to predict. If None extracts values from LightweightModel.
             val_epoch_frequency: Frequency of writing. Defaults to 1 i.e. every epoch is written.
+            overwrite_results_folder: If true, might overwrite existing folder.
         """
+        if results_folder:
+            output_dir = os.path.join(output_dir, results_folder)
         self._output_dir = output_dir
+        os.makedirs(self._output_dir, exist_ok=overwrite_results_folder)
         self._output_file_prefix = output_file_prefix
         self._additional_attributes = additional_attributes or []
         self._prediction_labels = prediction_labels
@@ -242,9 +188,9 @@ class WriteValToParquet(Callback):
         outputs = outputs["preds"][0]
         for idx, pred_label in enumerate(chain(model.prediction_labels)):
             # print(idx, pred_label, outputs)
-            self._cache[pred_label] += outputs[:, idx].tolist()
+            self._cache[pred_label].extend(outputs[:, idx].tolist())
         for idx, attribute in enumerate(self._additional_attributes):
-            self._cache[attribute].extend(batch[attribute])
+            self._cache[attribute].extend(batch[attribute].tolist())
 
     def _write_cache_to_disk(self, filename: str) -> None:
         df = pd.DataFrame(self._cache)

@@ -1,0 +1,5 @@
+edge_definition:
+  class_path: graphnet.models.graphs.KNNEdges
+  init_args:
+    nb_nearest_neighbours: null
+    columns: null

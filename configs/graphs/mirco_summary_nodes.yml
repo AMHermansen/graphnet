@@ -1,0 +1,6 @@
+node_definition:
+  class_path: graphnet.models.graphs.MircoSummaryNodes
+  init_args:
+    times: null
+    time_quantiles: null
+    dom_specifiers: null

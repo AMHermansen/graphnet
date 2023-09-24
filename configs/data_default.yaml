@@ -1,0 +1,69 @@
+# lightning.pytorch==2.0.9
+# data module template config
+db: /lustre/hpc/icecube/andreash/workspace/graphnet/data/examples/sqlite/prometheus/prometheus-events.db
+pulsemaps:
+  - total
+graph_definition:
+  class_path: graphnet.models.graphs.GraphDefinition
+  init_args:
+    detector:
+      class_path: graphnet.models.detector.Prometheus
+    node_definition:
+      class_path: graphnet.models.graphs.NodesAsPulses
+    edge_definition:
+      class_path: graphnet.models.graphs.KNNEdges
+      init_args:
+        nb_nearest_neighbours: 8
+        columns:
+          - 0
+          - 1
+          - 2
+features:
+  - sensor_pos_x
+  - sensor_pos_y
+  - sensor_pos_z
+  - t
+truth:
+  - injection_energy
+  - injection_type
+  - injection_interaction_type
+  - injection_zenith
+  - injection_azimuth
+  - injection_bjorkenx
+  - injection_bjorkeny
+  - injection_position_x
+  - injection_position_y
+  - injection_position_z
+  - injection_column_depth
+  - primary_lepton_1_type
+  - primary_hadron_1_type
+  - primary_lepton_1_position_x
+  - primary_lepton_1_position_y
+  - primary_lepton_1_position_z
+  - primary_hadron_1_position_x
+  - primary_hadron_1_position_y
+  - primary_hadron_1_position_z
+  - primary_lepton_1_direction_theta
+  - primary_lepton_1_direction_phi
+  - primary_hadron_1_direction_theta
+  - primary_hadron_1_direction_phi
+  - primary_lepton_1_energy
+  - primary_hadron_1_energy
+  - total_energy
+  - dummy_pid
+batch_size: 128
+train_shuffle: true
+selection:
+  train: /lustre/hpc/icecube/andreash/workspace/graphnet/configs/selections/train.csv
+  val: /lustre/hpc/icecube/andreash/workspace/graphnet/configs/selections/val.csv
+  test: /lustre/hpc/icecube/andreash/workspace/graphnet/configs/selections/test.csv
+num_workers: 10
+persistent_workers: true
+node_truth: null
+truth_table: mc_truth
+node_truth_table: null
+string_selection: null
+loss_weight_table: null
+loss_weight_column: null
+index_column: event_no
+labels: null
