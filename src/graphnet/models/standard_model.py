@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union, Type
 import numpy as np
 import torch
 from lightning.pytorch import Callback, Trainer
-from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from torch import Tensor
 from torch.nn import ModuleList
 from torch.optim import Adam
@@ -389,6 +389,13 @@ class StandardModel(Model):
         callbacks = [GNProgressBar()]
         callbacks = self._add_early_stopping(
             val_dataloader=val_dataloader, callbacks=callbacks
+        )
+        callbacks.append(
+            ModelCheckpoint(
+                filename="'{epoch}-{val_loss:.2f}-{other_metric:.2f}'",
+                monitor="val_loss",
+                save_top_k=5,
+            )
         )
         return callbacks
 
