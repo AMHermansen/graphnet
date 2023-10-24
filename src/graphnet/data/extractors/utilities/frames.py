@@ -1,6 +1,6 @@
 """Utility methods for working with I3Frames."""
 
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Union, List
 
 from graphnet.utilities.imports import has_icecube_package
 
@@ -12,22 +12,32 @@ if has_icecube_package():
 
 
 def frame_is_montecarlo(
-    frame: "icetray.I3Frame", mctree: Optional[str] = "I3MCTree"
+    frame: "icetray.I3Frame",
+    mctree: Union[str, List[str]],
 ) -> bool:
     """Check whether `frame` is from Monte Carlo simulation."""
-    return ("MCInIcePrimary" in frame) or (mctree in frame)
+    if isinstance(mctree, str):
+        mctree = [mctree]
+    return ("MCInIcePrimary" in frame) or any([x in frame for x in mctree])
 
 
 def frame_is_noise(
-    frame: "icetray.I3Frame", mctree: Optional[str] = "I3MCTree"
+    frame: "icetray.I3Frame", mctree: Union[str, List[str]]
 ) -> bool:
     """Check whether `frame` is from noise."""
+    if isinstance(mctree, str):
+        mctree = [mctree]
+    used_tree = None
+    for tree in mctree:
+        if tree in frame:
+            used_tree = tree
+            break
     try:
-        frame[mctree][0].energy
+        frame[used_tree][0].energy  # noqa
         return False
     except:  # noqa: E722
         try:
-            frame["MCInIcePrimary"].energy
+            frame["MCInIcePrimary"].energy  # noqa
             return False
         except:  # noqa: E722
             return True

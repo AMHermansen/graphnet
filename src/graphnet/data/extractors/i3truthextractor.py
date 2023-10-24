@@ -2,7 +2,7 @@
 
 import numpy as np
 import matplotlib.path as mpath
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from graphnet.data.extractors.i3extractor import I3Extractor
 from graphnet.data.extractors.utilities.frames import (
@@ -26,7 +26,7 @@ class I3TruthExtractor(I3Extractor):
         self,
         name: str = "truth",
         borders: Optional[List[np.ndarray]] = None,
-        mctree: Optional[str] = "I3MCTree",
+        mctree: Optional[Union[str, List[str]]] = None,
     ):
         """Construct I3TruthExtractor.
 
@@ -36,7 +36,8 @@ class I3TruthExtractor(I3Extractor):
                 coordinates, for identifying, e.g., particles starting and
                 stopping within the detector. Defaults to hard-coded boundary
                 coordinates.
-            mctree: Str of which MCTree to use for truth values.
+            mctree: Str or list of strings in priority order of MCTree to use
+                for truth values. Defaults to ["I3MCTree", "I3MCTree_preMuonProp"].
         """
         # Base class constructor
         super().__init__(name)
@@ -78,7 +79,9 @@ class I3TruthExtractor(I3Extractor):
             self._borders = [border_xy, border_z]
         else:
             self._borders = borders
-        self._mctree = mctree
+        if isinstance(mctree, str):
+            mctree = [mctree]
+        self._mctree = mctree or ["I3MCTree", "I3MCTree_preMuonProp"]
 
     def __call__(
         self, frame: "icetray.I3Frame", padding_value: Any = -1
@@ -223,7 +226,7 @@ class I3TruthExtractor(I3Extractor):
     def _extract_dbang_decay_length(
         self, frame: "icetray.I3Frame", padding_value: float = -1
     ) -> float:
-        mctree = frame[self._mctree]
+        mctree = self._find_first_mctree(frame)
         try:
             p_true = mctree.primaries[0]
             p_daughters = mctree.get_daughters(p_true)
@@ -349,14 +352,15 @@ class I3TruthExtractor(I3Extractor):
                 or 0 (neither); and the elasticity in the range ]0,1[.
         """
         if sim_type != "noise":
+            mctree = self._find_first_mctree(frame)
             try:
                 MCInIcePrimary = frame["MCInIcePrimary"]
             except KeyError:
-                MCInIcePrimary = frame[self._mctree][0]
+                MCInIcePrimary = mctree[0]
             if (
                 MCInIcePrimary.energy != MCInIcePrimary.energy
             ):  # This is a nan check. Only happens for some muons where second item in MCTree is primary. Weird!
-                MCInIcePrimary = frame[self._mctree][
+                MCInIcePrimary = mctree[
                     1
                 ]  # For some strange reason the second entry is identical in all variables and has no nans (always muon)
         else:
@@ -386,7 +390,7 @@ class I3TruthExtractor(I3Extractor):
             Tuple containing the energy of tracks from primary, and the
                 corresponding inelasticity.
         """
-        mc_tree = frame[self._mctree]
+        mc_tree = self._find_first_mctree(frame)
         primary = mc_tree.primaries[0]
         daughters = mc_tree.get_daughters(primary)
         tracks = []
@@ -417,7 +421,7 @@ class I3TruthExtractor(I3Extractor):
         # @TODO: Rewrite to automatically infer `mc` from `input_file`?
         if not mc:
             sim_type = "data"
-        elif "muon" in input_file:
+        elif "muon" in input_file.lower():
             sim_type = "muongun"
         elif "corsika" in input_file:
             sim_type = "corsika"
@@ -430,3 +434,15 @@ class I3TruthExtractor(I3Extractor):
         else:
             sim_type = "NuGen"
         return sim_type
+
+    def _find_first_mctree(self, frame: "icetray.I3Frame") -> "icetray.I3Tree":
+        first_mctree = None
+        for tree in self._mctree:
+            if tree in frame:
+                first_mctree = tree
+                break
+        if first_mctree is None:
+            self.error("mctree not found in frame")
+            raise KeyError("mctree not found in frame")
+        mctree = frame[first_mctree]
+        return mctree
