@@ -359,10 +359,10 @@ class DataConverter(ABC, Logger):
     ) -> None:
         """Update `self._index` and `self._output_files`.
 
-        If `pool` is set, it means that multiprocessing was used. In this case,
-        the worker processes will not have been able to write directly to
-        `self._index` and `self._output_files`, and we need to get them synced
-        up.
+        If `pool` is set, it means that multiprocessing was used. In
+        this case, the worker processes will not have been able to write
+        directly to `self._index` and `self._output_files`, and we need
+        to get them synced up.
         """
         if pool:
             # Extract information from shared variables to member variables.

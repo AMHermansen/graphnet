@@ -2,5 +2,5 @@
 
 `graphnet.training` manages model training and experiment logging.
 """
-from .callbacks import GNProgressBar, WriteValToParquet
+from .callbacks import GNProgressBar, BaseCacheValWriter
 from .scheduler import PiecewiseLinearLR

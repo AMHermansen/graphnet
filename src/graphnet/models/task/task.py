@@ -1,11 +1,14 @@
 """Base physics task-specific `Model` class(es)."""
 
 from abc import abstractmethod
+from pathlib import Path
 from typing import Any, TYPE_CHECKING, List, Tuple, Union
 from typing import Callable, Optional
 import numpy as np
+import pandas as pd
 
 import torch
+import typing
 from torch import Tensor
 from torch.nn import Linear
 from torch_geometric.data import Data
@@ -38,6 +41,30 @@ class Task(Model):
     def default_prediction_labels(self) -> List[str]:
         """Return default prediction labels."""
         return self._default_prediction_labels
+
+    def plot(
+        self,
+        cache: pd.DataFrame,
+        output_dir: str,
+        epoch: int,
+        style: Optional[Union[List[str], dict, Path]] = None,
+        output_prefix: Optional[str] = "",
+    ) -> bool:
+        """Create a plot of the model output and saves it to the output_dir.
+
+        Args:
+            cache: Cache of results from the model.
+            output_dir: Directory to save the plot to.
+            epoch: The current epoch, used for naming the plot.
+            style: Path to a preferred stylesheet for the plot.
+            output_prefix: Prefix to add to the plot name.
+
+        Returns: True if the plot was successfully created, False otherwise.
+        """
+        self.warning(
+            "plot method was called, but not implemented for this task."
+        )
+        return False
 
     def __init__(
         self,
@@ -108,6 +135,9 @@ class Task(Model):
 
         if isinstance(loss_function, str):
             loss_function = self._unsafe_parse_string(loss_function)
+        loss_function = typing.cast(
+            str, LossFunction
+        )  # Change type hint to LossFunction
 
         assert isinstance(target_labels, List)  # mypy
         assert isinstance(prediction_labels, List)  # mypy

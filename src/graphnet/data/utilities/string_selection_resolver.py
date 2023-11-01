@@ -67,10 +67,11 @@ class StringSelectionResolver(Logger):
     def resolve(self, selection: str) -> List[int]:
         """Resolve selection as string to list of indicies.
 
-        Selections are expected to have pandas.DataFrame.query-compatible
-        syntax, e.g., ``` "event_no % 5 > 0" ``` Selections may also specify a
-        fixed number of events to randomly sample, e.g., ``` "10000 random
-        events ~ event_no % 5 > 0" "20% random events ~ event_no % 5 > 0" ```
+        Selections are expected to have pandas.DataFrame.query-
+        compatible syntax, e.g., ``` "event_no % 5 > 0" ``` Selections
+        may also specify a fixed number of events to randomly sample,
+        e.g., ``` "10000 random events ~ event_no % 5 > 0" "20% random
+        events ~ event_no % 5 > 0" ```
         """
         self.info(f"Resolving selection: {selection}")
 
@@ -280,7 +281,8 @@ class StringSelectionResolver(Logger):
     ) -> Tuple[Optional[int], Optional[float], str]:
         """Parse the `selection` to extract num/frac of random events.
 
-        Returns the part of `selection` that did not relate to the above.
+        Returns the part of `selection` that did not relate to the
+        above.
         """
         # Default outputs.
         nb_events: Optional[int] = None

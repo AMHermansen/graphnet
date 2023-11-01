@@ -13,9 +13,9 @@ if has_icecube_package() or TYPE_CHECKING:
 class I3Extractor(ABC, Logger):
     """Base class for extracting information from physics I3-frames.
 
-    All classes inheriting from `I3Extractor` should implement the `__call__`
-    method, and can be applied directly on `icetray.I3Frame` objects to return
-    extracted, pure-python data.
+    All classes inheriting from `I3Extractor` should implement the
+    `__call__` method, and can be applied directly on `icetray.I3Frame`
+    objects to return extracted, pure-python data.
     """
 
     def __init__(self, name: str):

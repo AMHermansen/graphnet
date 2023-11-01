@@ -13,7 +13,8 @@ trainer:
     - class_path: graphnet.training.callbacks.GNProgressBar
     - class_path: graphnet.training.callbacks.WriteValToParquet
       init_args:
-        output_dir: /lustre/hpc/icecube/andreash/workspace/conf_test_out
+        output_dir: "/lustre/hpc/icecube/andreash/workspace/conf_test_out"
+        overwrite_results_folder: true  # default: false, might overwrite existing results if set to true. But can be useful when testing.
   fast_dev_run: false
   max_epochs: 20
   min_epochs: null

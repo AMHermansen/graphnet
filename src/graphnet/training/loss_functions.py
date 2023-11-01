@@ -8,6 +8,7 @@ from abc import abstractmethod
 from typing import Any, Optional, Union, List, Dict
 
 import numpy as np
+import pandas as pd
 import scipy.special
 import torch
 from torch import Tensor
@@ -62,6 +63,13 @@ class LossFunction(Model):
     @abstractmethod
     def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
         """Syntax like `.forward`, for implentation in inheriting classes."""
+
+    def convert_to_ids(self, target: pd.Series) -> Union[pd.Series, None]:
+        """Convert target to ids."""
+        self.warning(
+            "No conversion to ids implemented for this loss function."
+        )
+        return None
 
 
 class MSELoss(LossFunction):
@@ -198,6 +206,24 @@ class CrossEntropyLoss(LossFunction):
         return self._loss(
             prediction.float().to("cpu"), target_integer.to("cpu")
         )
+
+    def convert_to_ids(self, target: pd.Series) -> Union[pd.Series, None]:
+        """Convert target column to indices.
+
+        Args:
+            target: Single target column from all predicted  events.
+
+        Returns:
+            Converted target column if successful otherwise None.
+        """
+        if isinstance(self._options, int):
+            return target
+        elif isinstance(self._options, list):
+            return target.apply(lambda x: self._options.index(x))
+        elif isinstance(self._options, dict):
+            return target.apply(lambda x: self._options[x])
+        else:
+            return None  # Should never happen
 
 
 class BinaryCrossEntropyLoss(LossFunction):

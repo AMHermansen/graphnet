@@ -88,8 +88,8 @@ class I3RetroExtractor(I3Extractor):
                 if classifier in frame:
                     output.update({classifier: frame[classifier].value})
 
-        if frame_is_montecarlo(frame):
-            if frame_is_noise(frame):
+        if frame_is_montecarlo(frame, "MCTree"):
+            if frame_is_noise(frame, "MCTree"):
                 output.update(
                     {
                         "osc_weight": frame["noise_weight"]["weight"],

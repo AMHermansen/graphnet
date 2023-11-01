@@ -449,10 +449,11 @@ class Dataset(
     ) -> List[int]:
         """Resolve selection as string to list of indices.
 
-        Selections are expected to have pandas.DataFrame.query-compatible
-        syntax, e.g., ``` "event_no % 5 > 0" ``` Selections may also specify a
-        fixed number of events to randomly sample, e.g., ``` "10000 random
-        events ~ event_no % 5 > 0" "20% random events ~ event_no % 5 > 0" ```
+        Selections are expected to have pandas.DataFrame.query-
+        compatible syntax, e.g., ``` "event_no % 5 > 0" ``` Selections
+        may also specify a fixed number of events to randomly sample,
+        e.g., ``` "10000 random events ~ event_no % 5 > 0" "20% random
+        events ~ event_no % 5 > 0" ```
         """
         return self._string_selection_resolver.resolve(selection)
 

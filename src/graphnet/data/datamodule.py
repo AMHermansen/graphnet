@@ -148,7 +148,7 @@ class SQLiteDataModule(Logger, LightningDataModule):
             return input_value
         else:
             raise ValueError(
-                "Argument {input} has an unexpected type of {type(input)}"
+                f"Argument {input} has an unexpected type of {type(input)}"
             )
 
     @staticmethod

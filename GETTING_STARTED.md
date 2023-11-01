@@ -53,7 +53,7 @@ The main modules of GraphNeT are, in the order that you will likely use them:
   These components are packaged in a particularly simple way in `StandardModel`, but they are not specific to it.
   That is, they can be used in any combination, and alongside more specialised PyTorch/PyG code, as part of a more generic `Model`.
 
-- [`graphnet.training`](src/graphnet/training): For training GraphNeT models, including specifying a [`LossFunction`](src/graphnet/training/loss_functions.py), defining one or more custom target [`Label`s](src/graphnet/training/labels.py), using one or more [`Callback`s](src/graphnet/training/callbacks.py) to manage the training, applying a [`WeightFitter`](src/graphnet/training/weight_fitter.py) to get per-event weights for training, and more.
+- [`graphnet.training`](src/graphnet/training): For training GraphNeT models, including specifying a [`LossFunction`](src/graphnet/training/loss_functions.py), defining one or more custom target [`Label`s](src/graphnet/training/labels.py), using one or more [`Callback`s](src/graphnet/training/callbacks) to manage the training, applying a [`WeightFitter`](src/graphnet/training/weight_fitter.py) to get per-event weights for training, and more.
 - [`graphnet.deployment`](src/graphnet/deployment): For deploying a trained GraphNeT model for inference, for instance in an experiment-specific analysis software (e.g., `icetray` in the case of IceCube).
 
 In the following sections, we will go through some of the main elements of GraphNeT and give concrete examples of how to use them, such that, by the end, you will hopefully be able to start using and modifying them for you own needs!

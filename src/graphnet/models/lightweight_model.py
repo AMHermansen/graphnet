@@ -11,7 +11,6 @@ from .model import Model
 from .gnn.gnn import GNN
 from .graphs import GraphDefinition
 from .task import Task
-from graphnet.utilities.config import save_model_config
 
 
 class LightweightModel(Model):
@@ -70,6 +69,11 @@ class LightweightModel(Model):
             self.load_state_dict(state_dict_path)
 
         self._gnn.type(self._graph_definition._dtype)
+
+    @property
+    def tasks(self) -> ModuleList[Task]:
+        """Return tasks."""
+        return self._tasks
 
     @property
     def target_labels(self) -> List[str]:

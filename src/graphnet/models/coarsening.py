@@ -86,8 +86,9 @@ class Coarsening(Model):
     def _additional_features(self, cluster: LongTensor, data: Batch) -> Tensor:
         """Perform additional poolings of feature tensor `x` on `data`.
 
-        By default the nominal `pooling_method` is used for features as well.
-        This method can be overwritten for bespoke coarsening operations.
+        By default the nominal `pooling_method` is used for features as
+        well. This method can be overwritten for bespoke coarsening
+        operations.
         """
 
     def _transfer_attributes(

@@ -153,14 +153,12 @@ def plot_1D_contour(
                 ax[0].plot(
                     np.sin(np.deg2rad(x[variable])) ** 2,
                     x["mod_chi2"],
-                    color=color,
-                    label=label,
-                    ls=ls,
                 )
                 ax[0].set_xlabel("$\\sin(\\theta_{23})^2$", fontsize=12)
             elif variable == "dm31_fixed":
                 ax[1].plot(
-                    x[variable], x["mod_chi2"], color=color, label=label, ls=ls
+                    x[variable],
+                    x["mod_chi2"],
                 )
                 ax[1].ticklabel_format(axis="x", style="sci", scilimits=(0, 0))
                 ax[1].set_xlabel("$\\Delta m_{31}^2 [eV^2]$", fontsize=12)

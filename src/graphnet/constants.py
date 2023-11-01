@@ -38,3 +38,8 @@ MODEL_CONFIG_DIR = os.path.join(CONFIG_DIR, "models")
 PRETRAINED_MODEL_DIR = os.path.join(
     GRAPHNET_ROOT_DIR, "src", "graphnet", "models", "pretrained"
 )
+
+# Path to stylesheet for plotting
+STYLESHEET_PATH = os.path.join(
+    GRAPHNET_ROOT_DIR, "styles/graphnetstyle.mplstyle"
+)

@@ -31,8 +31,8 @@ if has_icecube_package() or TYPE_CHECKING:
 class GraphNeTI3Module:
     """Base I3 Module for GraphNeT.
 
-    Contains methods for extracting pulsemaps, producing graphs and writing to
-    frames.
+    Contains methods for extracting pulsemaps, producing graphs and
+    writing to frames.
     """
 
     def __init__(

@@ -41,7 +41,7 @@ class DynEdgeJINST(GNN):
         )
 
         # Base class constructor
-        super().__init__(nb_inputs, l6)
+        super().__init__(nb_inputs, [l6])
 
         # Graph convolutional operations
         features_subset = slice(0, 3)
