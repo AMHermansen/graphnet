@@ -43,6 +43,7 @@ class MulticlassClassificationTask(IdentityTask):
         )  # type: ignore
         if prediction_labels is not None:
             self._default_prediction_labels = prediction_labels
+            self._prediction_labels = prediction_labels
 
         if nb_outputs != len(self._default_prediction_labels):
             self.warning(
@@ -80,9 +81,17 @@ class MulticlassClassificationTask(IdentityTask):
         """
         style = style or [STYLESHEET_PATH]
         epoch_str = f"_epoch_{epoch}" if epoch is not None else ""
+
+        maybe_target_ids = self._loss_function.convert_to_ids(  # type: ignore
+            cache[self._target_labels[0]]  # Only expect one target label.
+        )
+        if maybe_target_ids is None:
+            return False
+
         common_hist_kwargs = dict(
             cache=cache,
-            prediction_labels=self._default_prediction_labels,
+            prediction_labels=self._prediction_labels,
+            target_ids=maybe_target_ids,
             output_dir=output_dir,
             style=style,
             logit_hist_data=self._logit_hist_data,
@@ -97,11 +106,6 @@ class MulticlassClassificationTask(IdentityTask):
             **common_hist_kwargs,
             y_log=False,
         )
-        maybe_target_ids = self._loss_function.convert_to_ids(  # type: ignore
-            cache[self.default_target_labels]
-        )
-        if maybe_target_ids is None:
-            return False
         common_roc_kwargs = dict(
             predictions=cache[self._default_prediction_labels],
             target_ids=maybe_target_ids,
@@ -119,6 +123,7 @@ class MulticlassClassificationTask(IdentityTask):
             **common_roc_kwargs,
             y_log=True,
         )
+        self.info(f"Plots saved to {output_dir}")
         return True
 
 

@@ -12,7 +12,6 @@ import typing
 from torch import Tensor
 from torch.nn import Linear
 from torch_geometric.data import Data
-from torchmetrics import Metric
 
 if TYPE_CHECKING:
     # Avoid cyclic dependency
@@ -71,7 +70,6 @@ class Task(Model):
         *,
         hidden_size: int,
         loss_function: Union[str, "LossFunction"],
-        additional_metrics: Optional[Union[List[Metric], Metric]] = None,
         target_labels: Optional[Union[str, List[str]]] = None,
         prediction_labels: Optional[Union[str, List[str]]] = None,
         transform_prediction_and_target: Optional[Union[Callable, str]] = None,
@@ -87,13 +85,12 @@ class Task(Model):
                 tasks, used to construct the affine transformation to the
                 predicted quantity.
             loss_function: Loss function appropriate to the task.
-            additional_metrics: Additional_metrics to keep track of.
             target_labels: Name(s) of the quantity/-ies being predicted, used
                 to extract the  target tensor(s) from the `Data` object in
                 `.compute_loss(...)`.
             prediction_labels: The name(s) of each column that is predicted by
-                the model during inference. If not given, the name will auto
-                matically be set to `target_label + _pred`.
+                the model during inference. If not given, the name will
+                automatically be set to `target_label + _pred`.
             transform_prediction_and_target: Optional function to transform
                 both the predicted and target tensor before passing them to the
                 loss function. Useful e.g. for having the model predict
@@ -125,8 +122,6 @@ class Task(Model):
             target_labels = self.default_target_labels
         if isinstance(target_labels, str):
             target_labels = [target_labels]
-        if isinstance(additional_metrics, Metric):
-            additional_metrics = [additional_metrics]
 
         if prediction_labels is None:
             prediction_labels = self.default_prediction_labels
@@ -135,9 +130,6 @@ class Task(Model):
 
         if isinstance(loss_function, str):
             loss_function = self._unsafe_parse_string(loss_function)
-        loss_function = typing.cast(
-            str, LossFunction
-        )  # Change type hint to LossFunction
 
         assert isinstance(target_labels, List)  # mypy
         assert isinstance(prediction_labels, List)  # mypy
@@ -179,8 +171,6 @@ class Task(Model):
 
         # Mapping from last hidden layer to required size of input
         self._affine = Linear(hidden_size, self.nb_inputs)
-
-        self.additional_metrics = additional_metrics
 
     @final
     def forward(self, x: Union[Tensor, Data]) -> Union[Tensor, Data]:

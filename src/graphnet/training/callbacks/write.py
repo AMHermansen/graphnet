@@ -9,6 +9,7 @@ import pandas as pd
 from lightning import Callback, Trainer
 from torch_geometric.data import Batch
 
+
 if TYPE_CHECKING:
     from graphnet.models.lightweight_model import LightweightModel  # type: ignore[attr-defined]
 
@@ -20,7 +21,7 @@ class BaseCacheValWriter(Callback, ABC):
         self,
         output_dir: Union[str, Path],
         results_folder: str = "results",
-        output_file_prefix: str = "validation_result",
+        output_file_prefix: str = "validation_result_",
         additional_attributes: Optional[List[str]] = None,
         prediction_labels: Optional[List[str]] = None,
         val_epoch_frequency: int = 1,
@@ -80,7 +81,7 @@ class BaseCacheValWriter(Callback, ABC):
             self._write_cache_to_disk(
                 os.path.join(
                     self._output_dir,
-                    f"{self._output_file_prefix}_epoch{trainer.current_epoch}{self.file_extension}",
+                    f"{self._output_file_prefix}epoch{trainer.current_epoch}{self.file_extension}",
                 ),
                 trainer,
                 model,
@@ -174,7 +175,7 @@ class WriteValToParquetWithPlot(WriteValToParquet):
     def _write_cache_to_disk(
         self, filename: str, trainer: Trainer, model: "LightweightModel"
     ) -> None:
-        super()._write_to_cache(filename, trainer, model)
+        super()._write_cache_to_disk(filename, trainer, model)
         for task in model.tasks:
             task.plot(
                 pd.DataFrame(self._cache),

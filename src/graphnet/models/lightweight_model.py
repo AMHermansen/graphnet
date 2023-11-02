@@ -71,7 +71,7 @@ class LightweightModel(Model):
         self._gnn.type(self._graph_definition._dtype)
 
     @property
-    def tasks(self) -> ModuleList[Task]:
+    def tasks(self) -> "ModuleList[Task]":
         """Return tasks."""
         return self._tasks
 

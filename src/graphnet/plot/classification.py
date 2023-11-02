@@ -16,6 +16,7 @@ from graphnet.plot.utils import (
 def default_hist_plot(
     cache: pd.DataFrame,
     prediction_labels: List[str],
+    target_ids: pd.Series,
     output_dir: Union[str, Path],
     style: Union[List[str], dict, Path, List],
     logit_hist_data: LogitHistData,
@@ -28,6 +29,7 @@ def default_hist_plot(
     Args:
         cache: Cache DataFrame containing predictions.
         prediction_labels: Labels indicating which columns are predictions.
+        target_ids: Primary target indexes.
         output_dir: Output directory.
         style: Path to StyleSheet for plot.
         logit_hist_data: LogitHistData dataclass object.
@@ -39,11 +41,16 @@ def default_hist_plot(
     """
     with (plt.style.context(style)):
         fig, ax = plt.subplots()
-        for pred_label in prediction_labels:
+        for index, pred_label in enumerate(prediction_labels):
             logits = np.log(
-                (p_eps := (cache[pred_label] - 2 * logit_hist_data.epsilon))
+                (
+                    p_eps := (
+                        cache[target_ids == index][pred_label]
+                        - 2 * logit_hist_data.epsilon
+                    )
+                )
                 / (1 - p_eps)
-            )
+            ).dropna()
             ax.hist(
                 logits,
                 bins=logit_hist_data.bins,
@@ -104,11 +111,11 @@ def default_roc_curve(
             ax.plot(
                 fpr,
                 tpr,
-                label=f"{legend_label} (auc = {roc_auc:{roc_curve_data.auc_format}})",
+                label=f"{legend_label}\nauc={roc_auc:{roc_curve_data.auc_format}}",
             )
         ax.plot(
-            [0, 1],
-            [0, 1],
+            np.linspace(1e-08, 1, 100),
+            np.linspace(1e-08, 1, 100),
             color="k",
             linestyle="--",
             linewidth=0.75,
@@ -121,7 +128,6 @@ def default_roc_curve(
         ax.legend()
         maybe_log = "log_" if y_log else ""
         fig.savefig(
-            Path(output_dir)
-            / f"{file_prefix}{maybe_log}logit_hist{file_suffix}.png",
+            Path(output_dir) / f"{file_prefix}{maybe_log}roc{file_suffix}.png",
         )
         plt.close(fig)
