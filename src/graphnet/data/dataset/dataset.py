@@ -1,5 +1,5 @@
 """Base :py:class:`Dataset` class(es) used in GraphNeT."""
-
+import dataclasses
 from copy import deepcopy
 from abc import ABC, abstractmethod
 from typing import (
@@ -17,8 +17,10 @@ from typing import (
 
 import numpy as np
 import torch
+from torch.utils.data import ConcatDataset, Sampler, BatchSampler
 from torch_geometric.data import Data
 
+import graphnet.training.utils
 from graphnet.constants import GRAPHNET_ROOT_DIR
 from graphnet.data.utilities.string_selection_resolver import (
     StringSelectionResolver,
@@ -29,7 +31,6 @@ from graphnet.utilities.config import (
     DatasetConfig,
     DatasetConfigSaverABCMeta,
 )
-from graphnet.utilities.config.parsing import traverse_and_apply
 from graphnet.utilities.logging import Logger
 from graphnet.models.graphs import GraphDefinition
 

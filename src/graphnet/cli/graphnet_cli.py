@@ -15,15 +15,23 @@ class GraphnetCLI(LightningCLI):
         """blah."""
         # Add components to expected args.
         parser.add_subclass_arguments(
-            GNN, "gnn", help="The gnn used for the model."
+            GNN,
+            "gnn",
+            help="The gnn used for the model.",
+            required=True,
         )
         parser.add_subclass_arguments(
-            Task, "tasks", type=Union[List[Task], Task], help="Tasks"
+            Task,
+            "tasks",
+            type=Union[List[Task], Task],
+            help="Tasks",
+            required=True,
         )
         parser.add_subclass_arguments(
             GraphDefinition,
             "graph_definition",
             help="GraphDefinition used for preprocessing.",
+            required=True,
         )
         # Link components to correct modules.
         parser.link_arguments(
