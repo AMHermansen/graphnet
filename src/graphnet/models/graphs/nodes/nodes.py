@@ -131,7 +131,12 @@ class NodesAsPulses(NodeDefinition):
 
 class MaxNodesAsPulses(NodesAsPulses):
     """Represent each measured pulse of Cherenkov Radiation as a node."""
-    def __init__(self, max_length: int = 256, input_feature_names: Optional[List[str]] = None) -> None:
+
+    def __init__(
+        self,
+        max_length: int = 256,
+        input_feature_names: Optional[List[str]] = None,
+    ) -> None:
         """Construct `MaxNodesAsPulses`.
 
         Args:
@@ -142,9 +147,8 @@ class MaxNodesAsPulses(NodesAsPulses):
         # Base class constructor
         super().__init__(input_feature_names=input_feature_names)
 
-
     def _construct_nodes(self, x: torch.Tensor) -> Tuple[Data, List[str]]:
-        return Data(x=x[:self.max_length])
+        return Data(x=x[: self.max_length])
 
 
 class MAENodes(NodesAsPulses):
@@ -154,8 +158,12 @@ class MAENodes(NodesAsPulses):
     _time_idx = [3]
     _charge_idx = [4]
 
-
-    def __init__(self, max_length: int, masking_fraction: float, input_feature_names: Optional[List[str]] = None):
+    def __init__(
+        self,
+        max_length: int,
+        masking_fraction: float,
+        input_feature_names: Optional[List[str]] = None,
+    ):
         """Construct MAENodes.
 
         Args:
@@ -187,19 +195,20 @@ class MAENodes(NodesAsPulses):
         self._add_time_duration(x, data)
         return data
 
-    def _add_charge_center(self, x: torch.Tensor, data):
-       xyz = x[:, self._xyz_idx]
-       charge = x[:, self._charge_idx]
-       charge /= torch.sum(charge)
-       charge_center = torch.mean(xyz*charge, dim=0)
+    def _add_charge_center(self, x: torch.Tensor, data: Data) -> None:
+        xyz = x[:, self._xyz_idx]
+        charge = x[:, self._charge_idx]
+        charge /= torch.sum(charge)
+        charge_center = torch.mean(xyz * charge, dim=0)
 
-       data.xq_mean = charge_center[0]
-       data.yq_mean = charge_center[1]
-       data.zq_mean = charge_center[2]
+        data.xq_mean = charge_center[0]
+        data.yq_mean = charge_center[1]
+        data.zq_mean = charge_center[2]
 
-    def _add_time_duration(self, x: torch.Tensor, data):
+    def _add_time_duration(self, x: torch.Tensor, data: Data) -> None:
         time = x[:, self._time_idx]
         data.time_duration = torch.max(time) - torch.min(time)
+
 
 class PercentileClusters(NodeDefinition):
     """Represent nodes as clusters with percentile summary node features.
@@ -284,23 +293,3 @@ class PercentileClusters(NodeDefinition):
             raise AttributeError
 
         return Data(x=torch.tensor(array))
-
-
-if __name__ == "__main__":
-    mae = MAENodes(256, 0.5, [0, 1, 2, 3, 4, 5, 6])
-    a = torch.rand(12, 7)
-    a1 = torch.rand(16, 7)
-    b = mae(a)[0]
-    b1 = mae(a1)[0]
-    from icecream import ic
-    from torch_geometric.data import Batch
-
-    ic(b.ids_keep, b.ids_restore)
-    ic(b1.ids_keep, b1.ids_restore)
-    ic(b, b1)
-    ic(Batch.from_data_list([b1, b]))
-    ic(Batch.from_data_list([b, b1]).ids_keep)
-    ic(Batch.from_data_list([b, b1]).n_kept)
-    ic(Batch.from_data_list([b, b1]).ptr)
-    batch = Batch.from_data_list([b, b1])
-    ic(mq := torch.stack([batch.xq_mean, batch.yq_mean, batch.zq_mean], dim=-1), mq.shape)

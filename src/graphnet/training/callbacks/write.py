@@ -191,8 +191,14 @@ class WriteValToParquetWithPlot(WriteValToParquet):
 
 
 class MAEWriteCB(BasePredictionWriter):
+    """Callback to write results from Masked AutoEncoder to disk."""
 
     def __init__(self, output_dir: str):
+        """Initialize callback.
+
+        Args:
+            output_dir: Directory to write results to.
+        """
         super().__init__("batch")
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
@@ -208,10 +214,24 @@ class MAEWriteCB(BasePredictionWriter):
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> None:
+        """Write results to disk after each batch.
 
+        Args:
+            trainer: Trainer object.
+            pl_module: Lightning Module.
+            prediction: Predictions from Lightning Module, expects dictionary containing "mask", "x_pred", "cls_pred", "cls_target".
+            batch_indices: No idea.
+            batch: The data the model received.
+            batch_idx: Batch index.
+            dataloader_idx: Dataloader index.
+
+        Returns: None.
+        """
         ae_mask = prediction["mask"].detach().cpu().numpy()
         x_pred = prediction["x_pred"].detach().cpu().numpy()
-        x_true, padding_mask = torch_geometric.utils.to_dense_batch(batch.x, batch.batch)
+        x_true, padding_mask = torch_geometric.utils.to_dense_batch(
+            batch.x, batch.batch
+        )
         x_true = x_true.detach().cpu().numpy()
         padding_mask = padding_mask.detach().cpu().numpy()
         cls_pred = prediction["cls_pred"].detach().cpu().numpy()
@@ -221,6 +241,11 @@ class MAEWriteCB(BasePredictionWriter):
         np.save(f"{self.output_dir}/batch_{batch_idx}/ae_mask.npy", ae_mask)
         np.save(f"{self.output_dir}/batch_{batch_idx}/x_pred.npy", x_pred)
         np.save(f"{self.output_dir}/batch_{batch_idx}/x_true.npy", x_true)
-        np.save(f"{self.output_dir}/batch_{batch_idx}/padding_mask.npy", padding_mask)
+        np.save(
+            f"{self.output_dir}/batch_{batch_idx}/padding_mask.npy",
+            padding_mask,
+        )
         np.save(f"{self.output_dir}/batch_{batch_idx}/cls_pred.npy", cls_pred)
-        np.save(f"{self.output_dir}/batch_{batch_idx}/cls_target.npy", cls_target)
+        np.save(
+            f"{self.output_dir}/batch_{batch_idx}/cls_target.npy", cls_target
+        )
