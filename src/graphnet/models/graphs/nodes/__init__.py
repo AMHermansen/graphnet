@@ -5,6 +5,6 @@ general graph-manipulation.´EdgeDefinition´ defines how edges are drawn
 between nodes and their features.
 """
 
-from .nodes import NodeDefinition, NodesAsPulses
+from .nodes import NodeDefinition, NodesAsPulses, PercentileClusters, MaxNodesAsPulses
 from .cropped_nodes import PulsesCroppedRandomly, PulsesCroppedValue
 from .summary_nodes import MircoSummaryNodes

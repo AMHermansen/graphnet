@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import torch
 from lightning import LightningModule
+from torch_geometric.data import Data
 
 from graphnet.utilities.logging import Logger
 from graphnet.utilities.config import (
@@ -19,7 +20,11 @@ from graphnet.utilities.config import (
 class Model(
     Logger, Configurable, LightningModule, ABC, metaclass=ModelConfigSaverABC
 ):
-    """Base class for all models in graphnet."""
+    """Base class for all components in graphnet."""
+
+    @staticmethod
+    def _get_batch_size(data: List[Data]) -> int:
+        return sum([torch.numel(torch.unique(d.batch)) for d in data])
 
     def save(self, path: str) -> None:
         """Save entire model to `path`."""

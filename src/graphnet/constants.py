@@ -43,3 +43,8 @@ PRETRAINED_MODEL_DIR = os.path.join(
 STYLESHEET_PATH = os.path.join(
     GRAPHNET_ROOT_DIR, "styles/graphnetstyle.mplstyle"
 )
+
+# Geometry Tables
+GEOMETRY_TABLE_DIR = os.path.join(DATA_DIR, "geometry_tables")
+ICECUBE_GEOMETRY_TABLE_DIR = os.path.join(GEOMETRY_TABLE_DIR, "icecube")
+PROMETHEUS_GEOMETRY_TABLE_DIR = os.path.join(GEOMETRY_TABLE_DIR, "prometheus")

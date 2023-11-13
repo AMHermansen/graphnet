@@ -11,3 +11,5 @@ together to form a complete GNN
 from .model import Model
 from .standard_model import StandardModel
 from .lightweight_model import LightweightModel
+from .mae_lit import MAELitR
+from .old_mae_lit import MAELit

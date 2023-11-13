@@ -6,14 +6,15 @@ input and can be passed to dataloaders during training and deployment.
 """
 
 
-from typing import Any, List, Optional, Dict, Callable
+from typing import Any, List, Optional, Dict, Callable, Union
 import torch
 from torch_geometric.data import Data
 import numpy as np
+from numpy.random import default_rng, Generator
 
 from graphnet.models.detector import Detector
 from .edges import EdgeDefinition
-from .nodes import NodeDefinition
+from .nodes import NodeDefinition, NodesAsPulses
 from graphnet.models import Model
 
 
@@ -25,8 +26,13 @@ class GraphDefinition(Model):
         detector: Detector,
         node_definition: NodeDefinition,
         edge_definition: Optional[EdgeDefinition] = None,
-        node_feature_names: Optional[List[str]] = None,
-        dtype: Optional[torch.dtype] = torch.float32,
+        input_feature_names: Optional[List[str]] = None,
+        dtype: Optional[torch.dtype] = torch.float,
+        seed: Optional[Union[int, Generator]] = None,
+        add_inactive_sensors: bool = False,
+        sensor_mask: Optional[List[int]] = None,
+        string_mask: Optional[List[int]] = None,
+        sort_by: str = None,
     ):
         """Construct ´GraphDefinition´. The ´detector´ holds.
 
@@ -39,10 +45,19 @@ class GraphDefinition(Model):
 
         Args:
             detector: The corresponding ´Detector´ representing the data.
-            node_definition: Definition of nodes.
+            node_definition: Definition of nodes. Defaults to NodesAsPulses.
             edge_definition: Definition of edges. Defaults to None.
-            node_feature_names: Names of node feature columns. Defaults to None
+            input_feature_names: Names of each column in expected input data
+                that will be built into a graph. If not provided,
+                it is automatically assumed that all features in `Detector` is
+                used.
             dtype: data type used for node features. e.g. ´torch.float´
+            add_inactive_sensors: If True, inactive sensors will be appended
+                to the graph with padded pulse information. Defaults to False.
+            sensor_mask: A list of sensor id's to be masked from the graph. Any
+                sensor listed here will be removed from the graph. Defaults to None.
+            string_mask: A list of string id's to be masked from the graph. Defaults to None.
+            sort_by: Name of node feature to sort by. Defaults to None.
         """
         # Base class constructor
         super().__init__(name=__name__, class_name=self.__class__.__name__)
@@ -51,25 +66,48 @@ class GraphDefinition(Model):
         self._detector = detector
         self._edge_definition = edge_definition
         self._node_definition = node_definition
-        if node_feature_names is None:
-            # Assume all features in Detector is used.
-            node_feature_names = list(self._detector.feature_map().keys())  # type: ignore
-        self._node_feature_names = node_feature_names
+        self._sensor_mask = sensor_mask
+        self._string_mask = string_mask
+        self._add_inactive_sensors = add_inactive_sensors
 
+        self._resolve_masks()
+
+        if input_feature_names is None:
+            # Assume all features in Detector is used.
+            input_feature_names = list(self._detector.feature_map().keys())  # type: ignore
+        self._input_feature_names = input_feature_names
+
+        # Set input data column names for node definition
+        self._node_definition.set_output_feature_names(
+            self._input_feature_names
+        )
+        self.output_feature_names = self._node_definition._output_feature_names
+
+        # Sorting
+        if sort_by is not None:
+            assert isinstance(sort_by, str)
+            try:
+                sort_by = self.output_feature_names.index(sort_by)  # type: ignore
+            except ValueError as e:
+                self.error(
+                    f"{sort_by} not in node features {self.output_feature_names}."
+                )
+                raise e
+        self._sort_by = sort_by
         # Set data type
-        # self.to(dtype)
+        self.to(dtype)
 
         # Set Input / Output dimensions
         self._node_definition.set_number_of_inputs(
-            node_feature_names=node_feature_names
+            input_feature_names=input_feature_names
         )
-        self._nb_inputs = len(self._node_feature_names)
+        self._nb_inputs = len(self._input_feature_names)
         self._nb_outputs = self._node_definition.nb_outputs
 
     def forward(  # type: ignore
         self,
-        node_features: np.ndarray,
-        node_feature_names: List[str],
+        input_features: np.ndarray,
+        input_feature_names: List[str],
         truth_dicts: Optional[List[Dict[str, Any]]] = None,
         custom_label_functions: Optional[Dict[str, Callable[..., Any]]] = None,
         loss_weight_column: Optional[str] = None,
@@ -80,13 +118,16 @@ class GraphDefinition(Model):
         """Construct graph as ´Data´ object.
 
         Args:
-            node_features: node features for graph. Shape ´[num_nodes, d]´
-            node_feature_names: name of each column. Shape ´[,d]´.
+            input_features: Input features for graph construction. Shape ´[num_rows, d]´
+            input_feature_names: name of each column. Shape ´[,d]´.
             truth_dicts: Dictionary containing truth labels.
             custom_label_functions: Custom label functions. See https://github.com/graphnet-team/graphnet/blob/main/GETTING_STARTED.md#adding-custom-truth-labels.
-            loss_weight_column: Name of column that holds loss weight. Defaults to None.
+            loss_weight_column: Name of column that holds loss weight.
+                                Defaults to None.
             loss_weight: Loss weight associated with event. Defaults to None.
-            loss_weight_default_value: default value for loss weight. Used in instances where some events have no pre-defined loss weight. Defaults to None.
+            loss_weight_default_value: default value for loss weight.
+                    Used in instances where some events have
+                    no pre-defined loss weight. Defaults to None.
             data_path: Path to dataset data files. Defaults to None.
 
         Returns:
@@ -94,27 +135,47 @@ class GraphDefinition(Model):
         """
         # Checks
         self._validate_input(
-            node_features=node_features, node_feature_names=node_feature_names
+            input_features=input_features,
+            input_feature_names=input_feature_names,
         )
 
+        # Add inactive sensors if `add_inactive_sensors = True`
+        if self._add_inactive_sensors:
+            input_features = self._attach_inactive_sensors(
+                input_features, input_feature_names
+            )
+
+        # Mask out sensors if `sensor_mask` is given
+        if self._sensor_mask is not None:
+            input_features = self._mask_sensors(
+                input_features, input_feature_names
+            )
+
         # Transform to pytorch tensor
-        node_features = torch.tensor(node_features, dtype=self.dtype)
+        input_features = torch.tensor(input_features, dtype=self.dtype)
 
         # Standardize / Scale  node features
-        node_features = self._detector(node_features, node_feature_names)
+        input_features = self._detector(input_features, input_feature_names)
 
-        # Create graph
-        graph = self._node_definition(node_features)  # (n, m)
+        # Create graph & get new node feature names
+        graph, node_feature_names = self._node_definition(input_features)
+        if self._sort_by is not None:
+            graph.x = graph.x[graph.x[:, self._sort_by].sort()[1]]
+
+        # Enforce dtype
+        graph.x = graph.x.type(self.dtype)
 
         # Attach number of pulses as static attribute.
-        graph.n_pulses = torch.tensor(len(node_features), dtype=torch.int32)
+        graph.n_pulses = torch.tensor(len(input_features), dtype=torch.int32)
 
         # Assign edges
         if self._edge_definition is not None:
             graph = self._edge_definition(graph)
         else:
-            self.warnonce(
-                "No EdgeDefinition provided. Graphs will not have edges defined!"
+
+            self.warning_once(
+                """No EdgeDefinition provided. 
+                Graphs will not have edges defined!"""  # noqa
             )
 
         # Attach data path - useful for Ensemble datasets.
@@ -141,29 +202,106 @@ class GraphDefinition(Model):
 
         # Attach node features as seperate fields. MAY NOT CONTAIN 'x'
         graph = self._add_features_individually(
-            graph=graph,
-            node_feature_names=node_feature_names,  # graph (n,m) / node (,d)
+            graph=graph, node_feature_names=node_feature_names
         )
 
         # Add GraphDefinition Stamp
         graph["graph_definition"] = self.__class__.__name__
         return graph
 
+    def _resolve_masks(self) -> None:
+        """Handle cases with sensor/string masks."""
+        if self._sensor_mask is not None:
+            if self._string_mask is not None:
+                assert (
+                    1 == 2
+                ), """Got arguments for both `sensor_mask`and `string_mask`. Please specify only one. """
+
+        if (self._sensor_mask is None) & (self._string_mask is not None):
+            self._sensor_mask = self._convert_string_to_sensor_mask()
+
+        return
+
+    def _convert_string_to_sensor_mask(self) -> List[int]:
+        """Convert a string mask to a sensor mask."""
+        string_id_column = self._detector.string_id_column
+        sensor_id_column = self._detector.sensor_id_column
+        geometry_table = self._detector.geometry_table
+        idx = geometry_table[string_id_column].isin(self._string_mask)
+        return np.asarray(geometry_table.loc[idx, sensor_id_column]).tolist()
+
+    def _attach_inactive_sensors(
+        self, input_features: np.ndarray, input_feature_names: List[str]
+    ) -> np.ndarray:
+        """Attach inactive sensors to `input_features`.
+
+        This function will query the detector geometry table and add any
+        sensor in the geometry table that is not already present in
+        `node_features`.
+        """
+        lookup = self._geometry_table_lookup(
+            input_features, input_feature_names
+        )
+        geometry_table = self._detector.geometry_table
+        unique_sensors = geometry_table.reset_index(drop=True)
+
+        # multiple lines to avoid long line:
+        inactive_idx = ~geometry_table.index.isin(lookup)
+        inactive_sensors = unique_sensors.loc[
+            inactive_idx, input_feature_names
+        ]
+        input_features = np.concatenate(
+            [input_features, inactive_sensors.to_numpy()], axis=0
+        )
+        return input_features
+
+    def _mask_sensors(
+        self, input_features: np.ndarray, input_feature_names: List[str]
+    ) -> np.ndarray:
+        """Mask sensors according to `sensor_mask`."""
+        sensor_id_column = self._detector.sensor_index_name
+        geometry_table = self._detector.geometry_table
+
+        lookup = self._geometry_table_lookup(
+            input_features=input_features,
+            input_feature_names=input_feature_names,
+        )
+        mask = ~geometry_table.loc[lookup, sensor_id_column].isin(
+            self._sensor_mask
+        )
+
+        return input_features[mask, :]
+
+    def _geometry_table_lookup(
+        self, input_features: np.ndarray, input_feature_names: List[str]
+    ) -> np.ndarray:
+        """Convert xyz in `input_features` into a set of sensor ids."""
+        lookup_columns = [
+            input_feature_names.index(feature)
+            for feature in self._detector.sensor_position_names
+        ]
+        idx = [*zip(*[tuple(input_features[:, k]) for k in lookup_columns])]
+        return self._detector.geometry_table.loc[idx, :].index
+
     def _validate_input(
-        self, node_features: np.ndarray, node_feature_names: List[str]
+        self, input_features: np.ndarray, input_feature_names: List[str]
     ) -> None:
         # node feature matrix dimension check
-        assert node_features.shape[1] == len(node_feature_names)
+        assert input_features.shape[1] == len(input_feature_names)
 
         # check that provided features for input is the same that the ´Graph´
         # was instantiated with.
-        assert len(node_feature_names) == len(
-            self._node_feature_names
-        ), f"""Input features ({node_feature_names}) is not what {self.__class__.__name__} was instatiated with ({self._node_feature_names})"""
-        for idx in range(len(node_feature_names)):
+        assert len(input_feature_names) == len(
+            self._input_feature_names
+        ), f"""Input features ({input_feature_names}) is not what 
+               {self.__class__.__name__} was instatiated
+               with ({self._input_feature_names})"""  # noqa
+        for idx in range(len(input_feature_names)):
             assert (
-                node_feature_names[idx] == self._node_feature_names[idx]
-            ), f""" Order of node features in data are not the same as expected. Got {node_feature_names} vs. {self._node_feature_names}"""
+                input_feature_names[idx] == self._input_feature_names[idx]
+            ), f""" Order of node features in data
+                    are not the same as expected. Got {input_feature_names} 
+                    vs. {self._input_feature_names}"""  # noqa
 
     def _add_loss_weights(
         self,
@@ -250,9 +388,11 @@ class GraphDefinition(Model):
             if feature not in ["x"]:  # reserved for node features.
                 graph[feature] = graph.x[:, index].detach()
             else:
-                self.warnonce(
-                    """Cannot assign graph['x']. This field is reserved for node features. Please rename your input feature."""
-                )
+                self.warning_once(
+                    """Cannot assign graph['x']. This field is reserved for
+                      node features. Please rename your input feature."""
+                )  # noqa
+
         return graph
 
     def _add_custom_labels(

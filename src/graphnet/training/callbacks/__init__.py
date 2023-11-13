@@ -4,4 +4,5 @@ from .write import (
     BaseCacheValWriter,
     WriteValToParquet,
     WriteValToParquetWithPlot,
+    MAEWriteCB,
 )

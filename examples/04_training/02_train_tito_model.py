@@ -5,20 +5,21 @@ from typing import Any, Dict, List, Optional
 
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
-import torch
 from torch.optim.adam import Adam
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from graphnet.constants import EXAMPLE_DATA_DIR, EXAMPLE_OUTPUT_DIR
 from graphnet.data.constants import FEATURES, TRUTH
 from graphnet.models import StandardModel
 from graphnet.models.detector.prometheus import Prometheus
-from graphnet.models.gnn import DynEdge
+from graphnet.models.gnn import DynEdgeTITO
 from graphnet.models.graphs import KNNGraph
-from graphnet.models.graphs.nodes import NodesAsPulses
-from graphnet.models.task.reconstruction import EnergyReconstruction
-from graphnet.training.callbacks import GNProgressBar
-from graphnet.training.scheduler import PiecewiseLinearLR
-from graphnet.training.loss_functions import LogCoshLoss
+from graphnet.models.task.reconstruction import (
+    DirectionReconstructionWithKappa,
+)
+from graphnet.training.labels import Direction
+from graphnet.training.callbacks import ProgressBar
+from graphnet.training.loss_functions import VonMisesFisher3DLoss
 from graphnet.training.utils import make_train_validation_dataloader
 from graphnet.utilities.argparse import ArgumentParser
 from graphnet.utilities.logging import Logger
@@ -73,19 +74,12 @@ def main(
         },
     }
 
-    archive = os.path.join(EXAMPLE_OUTPUT_DIR, "train_model_without_configs")
-    run_name = "dynedge_{}_example".format(config["target"])
+    graph_definition = KNNGraph(detector=Prometheus())
+    archive = os.path.join(EXAMPLE_OUTPUT_DIR, "train_tito_model")
+    run_name = "dynedgeTITO_{}_example".format(config["target"])
     if wandb:
         # Log configuration to W&B
         wandb_logger.experiment.config.update(config)
-
-    # Define graph representation
-    graph_definition = KNNGraph(
-        detector=Prometheus(),
-        node_definition=NodesAsPulses(),
-        nb_nearest_neighbours=8,
-        node_feature_names=features,
-    )
 
     (
         training_dataloader,
@@ -93,27 +87,34 @@ def main(
     ) = make_train_validation_dataloader(
         db=config["path"],
         graph_definition=graph_definition,
+        selection=None,
         pulsemaps=config["pulsemap"],
         features=features,
         truth=truth,
         batch_size=config["batch_size"],
         num_workers=config["num_workers"],
         truth_table=truth_table,
-        selection=None,
+        index_column="event_no",
+        labels={
+            "direction": Direction(
+                azimuth_key="injection_azimuth", zenith_key="injection_zenith"
+            )
+        },
     )
 
     # Building model
-
-    gnn = DynEdge(
+    gnn = DynEdgeTITO(
         nb_inputs=graph_definition.nb_outputs,
-        global_pooling_schemes=["min", "max", "mean", "sum"],
+        features_subset=[0, 1, 2, 3],
+        dyntrans_layer_sizes=[(256, 256), (256, 256), (256, 256), (256, 256)],
+        global_pooling_schemes=["max"],
+        use_global_features=True,
+        use_post_processing_layers=True,
     )
-    task = EnergyReconstruction(
+    task = DirectionReconstructionWithKappa(
         hidden_size=gnn.nb_outputs,
         target_labels=config["target"],
-        loss_function=LogCoshLoss(),
-        transform_prediction_and_target=lambda x: torch.log10(x),
-        transform_inference=lambda x: torch.pow(10, x),
+        loss_function=VonMisesFisher3DLoss(),
     )
     model = StandardModel(
         graph_definition=graph_definition,
@@ -121,17 +122,13 @@ def main(
         tasks=[task],
         optimizer_class=Adam,
         optimizer_kwargs={"lr": 1e-03, "eps": 1e-03},
-        scheduler_class=PiecewiseLinearLR,
+        scheduler_class=ReduceLROnPlateau,
         scheduler_kwargs={
-            "milestones": [
-                0,
-                len(training_dataloader) / 2,
-                len(training_dataloader) * config["fit"]["max_epochs"],
-            ],
-            "factors": [1e-2, 1, 1e-02],
+            "patience": config["early_stopping_patience"],
         },
         scheduler_config={
-            "interval": "step",
+            "frequency": 1,
+            "monitor": "val_loss",
         },
     )
 
@@ -141,7 +138,7 @@ def main(
             monitor="val_loss",
             patience=config["early_stopping_patience"],
         ),
-        GNProgressBar(),
+        ProgressBar(),
     ]
 
     model.fit(
@@ -153,12 +150,24 @@ def main(
     )
 
     # Get predictions
-    additional_attributes = model.target_labels
+    additional_attributes = [
+        "injection_zenith",
+        "injection_azimuth",
+        "event_no",
+    ]
+    prediction_columns = [
+        config["target"][0] + "_x_pred",
+        config["target"][0] + "_y_pred",
+        config["target"][0] + "_z_pred",
+        config["target"][0] + "_kappa_pred",
+    ]
+
     assert isinstance(additional_attributes, list)  # mypy
 
     results = model.predict_as_dataframe(
         validation_dataloader,
-        additional_attributes=additional_attributes + ["event_no"],
+        additional_attributes=additional_attributes,
+        prediction_columns=prediction_columns,
     )
 
     # Save predictions and model to file
@@ -167,9 +176,15 @@ def main(
     logger.info(f"Writing results to {path}")
     os.makedirs(path, exist_ok=True)
 
+    # Save results as .csv
     results.to_csv(f"{path}/results.csv")
-    model.save_state_dict(f"{path}/state_dict.pth")
+
+    # Save full model (including weights) to .pth file - Not version proof
     model.save(f"{path}/model.pth")
+
+    # Save model config and state dict - Version safe save method.
+    model.save_state_dict(f"{path}/state_dict.pth")
+    model.save_config(f"{path}/model_config.yml")
 
 
 if __name__ == "__main__":
@@ -199,7 +214,7 @@ Train GNN model without the use of config files.
             "Name of feature to use as regression target (default: "
             "%(default)s)"
         ),
-        default="total_energy",
+        default="direction",
     )
 
     parser.add_argument(
@@ -210,8 +225,8 @@ Train GNN model without the use of config files.
 
     parser.with_standard_arguments(
         "gpus",
-        ("max-epochs", 5),
-        "early-stopping-patience",
+        ("max-epochs", 1),
+        ("early-stopping-patience", 2),
         ("batch-size", 16),
         "num-workers",
     )
@@ -222,7 +237,7 @@ Train GNN model without the use of config files.
         help="If True, Weights & Biases are used to track the experiment.",
     )
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
 
     main(
         args.path,

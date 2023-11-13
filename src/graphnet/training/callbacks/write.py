@@ -5,9 +5,13 @@ from itertools import chain
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union, TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
-from lightning import Callback, Trainer
-from torch_geometric.data import Batch
+import torch
+from lightning import Callback, Trainer, LightningModule
+from lightning.pytorch.callbacks import BasePredictionWriter
+from torch_geometric.data import Batch, Data
+import torch_geometric
 
 
 if TYPE_CHECKING:
@@ -184,3 +188,39 @@ class WriteValToParquetWithPlot(WriteValToParquet):
                 self._style,
                 self._output_file_prefix,
             )
+
+
+class MAEWriteCB(BasePredictionWriter):
+
+    def __init__(self, output_dir: str):
+        super().__init__("batch")
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
+        self._cache: Dict[str, List] = {}
+
+    def write_on_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: LightningModule,
+        prediction: Dict[str, torch.Tensor],
+        batch_indices: Any,  # Don't know what this is...
+        batch: Data,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+
+        ae_mask = prediction["mask"].detach().cpu().numpy()
+        x_pred = prediction["x_pred"].detach().cpu().numpy()
+        x_true, padding_mask = torch_geometric.utils.to_dense_batch(batch.x, batch.batch)
+        x_true = x_true.detach().cpu().numpy()
+        padding_mask = padding_mask.detach().cpu().numpy()
+        cls_pred = prediction["cls_pred"].detach().cpu().numpy()
+        cls_target = prediction["cls_target"].detach().cpu().numpy()
+
+        os.makedirs(f"{self.output_dir}/batch_{batch_idx}", exist_ok=True)
+        np.save(f"{self.output_dir}/batch_{batch_idx}/ae_mask.npy", ae_mask)
+        np.save(f"{self.output_dir}/batch_{batch_idx}/x_pred.npy", x_pred)
+        np.save(f"{self.output_dir}/batch_{batch_idx}/x_true.npy", x_true)
+        np.save(f"{self.output_dir}/batch_{batch_idx}/padding_mask.npy", padding_mask)
+        np.save(f"{self.output_dir}/batch_{batch_idx}/cls_pred.npy", cls_pred)
+        np.save(f"{self.output_dir}/batch_{batch_idx}/cls_target.npy", cls_target)
