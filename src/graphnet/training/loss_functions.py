@@ -477,3 +477,75 @@ class VonMisesFisher3DLoss(VonMisesFisherLoss):
         kappa = prediction[:, 3]
         p = kappa.unsqueeze(1) * prediction[:, [0, 1, 2]]
         return self._evaluate(p, target)
+
+
+class VonMisesFisher3DLossWithOpeningAngle(VonMisesFisher3DLoss):
+    """von Mises-Fisher loss function vectors in the 3D plane.
+
+    With additional mean absolute error of cosine term.
+    """
+
+    def __init__(
+        self,
+        angle_loss: Optional[nn.Module] = None,
+        angle_weight: float = 1.0,
+        **kwargs: Dict[Any, Any],
+    ) -> None:
+        """Initialize VonMisesFisher3DLossWithOpeningAngle.
+
+        Args:
+            angle_loss: Loss function for opening angle. Defaults to L1Loss.
+            angle_weight: Weight of angle loss. Defaults to 1.
+            **kwargs: Keyword arguments passed to VonMisesFisher3DLoss.
+        """
+        self._angle_loss = angle_loss or nn.L1Loss()
+        self._angle_weight = angle_weight
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def _calculate_opening_angle(
+        prediction: torch.Tensor, target: torch.Tensor
+    ) -> torch.Tensor:
+        """Calculate the opening angle.
+
+        Args:
+            prediction: Output of the model. Must have shape [N, 4] where
+                columns 0, 1, 2 are predictions of `direction` and last column
+                is an estimate of `kappa`.
+            target: Target tensor, extracted from graph object.
+
+        Returns:
+            Elementwise opening angle. Shape [N,]
+        """
+        return torch.acos(
+            prediction[:, :3]
+            * target
+            / (
+                prediction[:, 0].pow(2)
+                + prediction[:, 1].pow(2)
+                + prediction[:, 2].pow(2)
+            )
+            .sqrt()
+            .unsqueeze(1)
+        )
+
+    def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
+        """Calculate von Mises-Fisher loss for a direction in the 3D.
+
+        Args:
+            prediction: Output of the model. Must have shape [N, 4] where
+                columns 0, 1, 2 are predictions of `direction` and last column
+                is an estimate of `kappa`.
+            target: Target tensor, extracted from graph object.
+
+        Returns:
+            Elementwise von Mises-Fisher loss terms. Shape [N,]
+        """
+        opening_angle = self._calculate_opening_angle(prediction, target)
+        return (
+            super()._forward(prediction, target)
+            + self._angle_weight
+            * self._angle_loss(opening_angle, torch.zeros_like(opening_angle))
+        ) / (
+            1 + self._angle_weight
+        )  # re-weight back to "1".
