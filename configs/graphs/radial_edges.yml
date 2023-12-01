@@ -1,0 +1,8 @@
+edge_definition:
+  class_path: graphnet.models.graphs.RadialEdges
+  init_args:
+    radius: null
+    columns:
+    - 0
+    - 1
+    - 2

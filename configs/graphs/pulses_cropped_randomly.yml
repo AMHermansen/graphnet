@@ -1,0 +1,4 @@
+node_definition:
+  class_path: graphnet.models.graphs.PulsesCroppedRandomly
+  init_args:
+    max_pulses: null

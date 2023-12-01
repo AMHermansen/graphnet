@@ -1,0 +1,12 @@
+task:
+  class_path: graphnet.models.task.EnergyReconstructionWithUncertainty
+  init_args:
+    loss_function: null
+    additional_metrics: null
+    target_labels: null
+    prediction_labels: null
+    transform_prediction_and_target: null
+    transform_target: null
+    transform_inference: null
+    transform_support: null
+    loss_weight: null

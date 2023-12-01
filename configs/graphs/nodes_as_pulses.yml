@@ -1,0 +1,2 @@
+node_definition:
+  class_path: graphnet.models.graphs.NodesAsPulses

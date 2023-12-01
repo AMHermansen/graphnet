@@ -1,0 +1,6 @@
+edge_definition:
+  class_path: graphnet.models.graphs.EuclideanEdges
+  init_args:
+    sigma: null
+    threshold: 0.0
+    columns: null

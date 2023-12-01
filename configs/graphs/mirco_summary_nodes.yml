@@ -1,0 +1,6 @@
+# node_definition:
+class_path: graphnet.models.graphs.MircoSummaryNodes
+init_args:
+  charge_at_times: [0.033, 0.166]
+  time_quantiles: [0.2, 0.5]
+  dom_specifiers: [0, 1, 2]

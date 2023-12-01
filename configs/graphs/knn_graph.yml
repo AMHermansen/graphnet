@@ -1,0 +1,12 @@
+graph_definition:
+  class_path: graphnet.models.graphs.KNNGraph
+  init_args:
+    detector: null
+    node_definition: null
+    node_feature_names: null
+    dtype: torch.float32
+    nb_nearest_neighbours: 8
+    columns:
+    - 0
+    - 1
+    - 2

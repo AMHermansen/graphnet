@@ -1,0 +1,12 @@
+gnn:
+  class_path: graphnet.models.gnn.DynEdgeTITO
+  init_args:
+    nb_inputs: null
+    features_subset:
+    - 0
+    - 1
+    - 2
+    - 3
+    dyntrans_layer_sizes: null
+    global_pooling_schemes:
+    - max

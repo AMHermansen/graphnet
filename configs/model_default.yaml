@@ -1,0 +1,28 @@
+# lightning.pytorch==2.0.9
+# model config template
+gnn:
+  class_path: ODynEdge
+  init_args:
+    nb_neighbours: 8
+    features_subset: null
+    dynedge_layer_sizes: null
+    post_processing_layer_sizes: null
+    readout_layer_sizes: null
+    global_pooling_schemes: null
+    add_global_variables_after_pooling: false
+tasks:
+  class_path: EnergyReconstruction
+  init_args:
+    loss_function:
+      class_path: LogCoshLoss
+    transform_inference: '!lambda x: torch.pow(10,x)'
+    transform_prediction_and_target: '!lambda x: torch.log10(x)'
+optimizer_class: lion_pytorch.Lion
+optimizer_kwargs:
+  lr: 1e-5
+scheduler_class: graphnet.training.callbacks.PiecewiseLinearLR
+scheduler_kwargs:
+  factors: [ 0.01, 1, 0.01 ]
+  milestones: [ 0, 20.0, 80 ]
+scheduler_config:
+  interval: step
