@@ -124,6 +124,23 @@ class IceMixT(Model):
         )
         return {"loss": loss, "preds": preds[0]}
 
+    def test_step(self, test_batch: Union[Data, List[Data]], batch_idx: int) -> Dict[str, Any]:
+        """Perform test step."""
+        if isinstance(test_batch, Data):
+            test_batch = [test_batch]
+        preds = self(test_batch)
+        loss = self._compute_loss(preds, test_batch)
+        self.log(
+            "test_loss",
+            loss,
+            batch_size=self._get_batch_size(test_batch),
+            prog_bar=True,
+            on_epoch=True,
+            on_step=False,
+            sync_dist=True,
+        )
+        return {"loss": loss, "preds": preds[0]}
+
     def predict_step(
         self, predict_batch: Union[Data, List[Data]], batch_idx: int
     ) -> Dict[str, Any]:
