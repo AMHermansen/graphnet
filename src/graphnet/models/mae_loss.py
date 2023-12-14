@@ -713,8 +713,7 @@ class CEGaussianCombinedLoss(nn.Module):
 
         # nll_loss = (x_remaining_pred_masked - x_true_masked).pow(2) / (2 * x_remaining_pred_var_masked.pow(2)) + torch.log(x_remaining_pred_var_masked)
         # nll_loss = torch.nn.functional.gaussian_nll_loss(x_true_masked, x_remaining_pred_masked, x_remaining_pred_var_masked, eps=self.eps, reduction='mean')
-        # nll_loss = torch.nn.functional.smooth_l1_loss(x_remaining_pred_masked.to(torch.float32), x_true_masked, reduction='mean')
-        # ic(nll_loss, ce_loss)
+        # nll_loss = torch.nn.functional.smooth_l1_loss(x_remaining_pred_masked.to(torch.float32), x_true_masked, reduction='mean'))
         return (
             ce_loss,
             {
@@ -724,3 +723,124 @@ class CEGaussianCombinedLoss(nn.Module):
             },
             {"target_rem": x_true, "target_sensor": sensor_id},
         )
+
+
+class GaussianTimeAE(AELoss):
+    """Loss function which uses Gaussian NLL on time."""
+    _time_index = 3
+
+    def __init__(self, latent_dim: int = 192, eps=1e-6):
+        """Initialize GaussianTimeAE.
+
+        Args:
+            latent_dim: Number of latent dimensions.
+            eps: Epsilon to avoid numerical instability.
+        """
+        super().__init__(latent_dim, output_dim=2)
+        self.eps = eps
+
+    def compute_loss(
+        self,
+        x_pred: torch.Tensor,
+        x_true: torch.Tensor,
+        mask: torch.Tensor,
+        data: Data,
+    ) -> torch.Tensor:
+        """Compute loss.
+
+        Args:
+            x_pred: Predictions.
+            x_true: True values.
+            mask: Masking from the MAE. True means hidden
+                during the encoding and only those are used.
+            data: Data object, containing information of the batch.
+
+        Returns: Reduced loss.
+        """
+        target = x_true[mask][:, self._time_index].to(torch.float32)
+        mu = x_pred[mask][:, 0].to(torch.float32)
+        log_sigma = x_pred[mask][:, 1].to(torch.float32)
+
+        loss = (0.5 * (target - mu).pow(2) * torch.exp(- 2 * log_sigma) + log_sigma)
+        return loss.mean()
+
+    def forward(
+        self,
+        x_latent: torch.Tensor,
+        x_true: torch.Tensor,
+        mask: torch.Tensor,
+        data: Data,
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        """Forward pass of Auto-Encoder Loss.
+
+                Args:
+                    x_latent: Latent representation of the data.
+                    x_true: True (scaled) values.
+                    mask: Masking from the MAE. True means hidden
+                        during the encoding and only those are used.
+                    data: Data object, containing information of the batch.
+
+                Returns: Tuple of loss, predictions and targets.
+                """
+        x_pred = self.proj(x_latent)
+        return self.compute_loss(x_pred, x_true, mask, data), x_pred, x_true
+
+
+class TimeAE(AELoss):
+    """Loss function which uses Gaussian NLL on time."""
+    _time_index = 3
+
+    def __init__(self, latent_dim: int = 192):
+        """Initialize GaussianTimeAE.
+
+        Args:
+            latent_dim: Number of latent dimensions.
+            eps: Epsilon to avoid numerical instability.
+        """
+        super().__init__(latent_dim, output_dim=1)
+
+    def compute_loss(
+            self,
+            x_pred: torch.Tensor,
+            x_true: torch.Tensor,
+            mask: torch.Tensor,
+            data: Data,
+    ) -> torch.Tensor:
+        """Compute loss.
+
+        Args:
+            x_pred: Predictions.
+            x_true: True values.
+            mask: Masking from the MAE. True means hidden
+                during the encoding and only those are used.
+            data: Data object, containing information of the batch.
+
+        Returns: Reduced loss.
+        """
+        target = x_true[mask][:, self._time_index].to(torch.float32)
+        pred = x_pred[mask][:, 0].to(torch.float32)
+
+        diff = pred - target
+        loss = diff + nn.functional.softplus(-2.0 * diff)
+        return loss.mean() / 10.0
+
+    def forward(
+            self,
+            x_latent: torch.Tensor,
+            x_true: torch.Tensor,
+            mask: torch.Tensor,
+            data: Data,
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        """Forward pass of Auto-Encoder Loss.
+
+                Args:
+                    x_latent: Latent representation of the data.
+                    x_true: True (scaled) values.
+                    mask: Masking from the MAE. True means hidden
+                        during the encoding and only those are used.
+                    data: Data object, containing information of the batch.
+
+                Returns: Tuple of loss, predictions and targets.
+                """
+        x_pred = self.proj(x_latent)
+        return self.compute_loss(x_pred, x_true, mask, data), x_pred, x_true

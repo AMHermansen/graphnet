@@ -507,6 +507,47 @@ class Extractor(nn.Module):
         return x
 
 
+class PositionExtractor(nn.Module):
+    """Position only Extractor module."""
+    def __init__(self, dim_base: int, dim: int):
+        """Initialize the PositionExtractor module.
+
+        Args:
+            dim_base: Base dimension of the model.
+            dim: Core dimension of the model.
+        """
+        super().__init__()
+        self.emb = SinusoidalPosEmb(dim=dim_base)
+        n_feat = 3
+        self.proj = nn.Sequential(
+            nn.Linear(n_feat * dim_base,
+                n_feat * dim_base,
+            ),
+            nn.LayerNorm(n_feat * dim_base),
+            nn.GELU(),
+            nn.Linear(n_feat * dim_base, dim),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass.
+
+        Args:
+            x: Scaled input data.
+
+        Returns: Output of the extractor.
+        """
+        pos = x
+        # Increase resolution of SinousoidalPosEmb.
+        x = torch.cat(
+            [
+                self.emb(4096 * pos).flatten(-2),
+            ],
+            dim=-1,
+        )
+        x = self.proj(x)
+        return x
+
+
 class RelativeSpaceTime(nn.Module):
     """RelativeSpaceTime attention-bias."""
 

@@ -6,6 +6,7 @@ from icecream import ic
 from .bept import (
     DeepIceModelNoExtractor,
     Extractor,
+    PositionExtractor,
     SinusoidalPosEmb,
     TransformerBlock,
 )
@@ -116,10 +117,11 @@ class MAELitR(Model):
 
     def _shared_step(self, data: Data) -> Tuple[torch.Tensor, torch.Tensor]:
         x_pred, mask, ids_restore = self.encode(data)
+        cls = x_pred[:, 0, :]
         if self.decoder_depth:
             x_pred = self.decode(data, ids_restore, x_pred)
         _, padding_mask = utils.to_dense_batch(data.x, data.batch)
-        return x_pred, mask & padding_mask
+        return x_pred, mask & padding_mask, cls
 
     def training_step(self, data: Data, batch_idx: int) -> Dict[str, Any]:
         """Training step of the model.
@@ -130,15 +132,15 @@ class MAELitR(Model):
 
         Returns: Dictionary containing various losses.
         """
-        x_pred, mask = self._shared_step(data)
-        ae_loss, cls_loss, *_ = self._compute_loss(data, x_pred, mask)
+        x_pred, mask, cls = self._shared_step(data)
+        ae_loss, cls_loss, *_ = self._compute_loss(data, x_pred, mask, cls)
         self.log(
             "train_ae",
             ae_loss,
             batch_size=self._get_batch_size([data]),
             prog_bar=True,
             on_epoch=True,
-            on_step=False,
+            on_step=True,
             sync_dist=True,
         )
         self.log(
@@ -182,7 +184,7 @@ class MAELitR(Model):
         Returns:
             Dictionary containing various relevant quantities.
         """
-        x_pred, mask = self._shared_step(data)
+        x_pred, mask, cls = self._shared_step(data)
         (
             ae_loss,
             cls_loss,
@@ -190,7 +192,7 @@ class MAELitR(Model):
             cls_target,
             x_pred,
             x_true,
-        ) = self._compute_loss(data, x_pred, mask)
+        ) = self._compute_loss(data, x_pred, mask, cls)
         self.log(
             "val_ae",
             ae_loss,
@@ -254,7 +256,7 @@ class MAELitR(Model):
         Returns:
             Dictionary containing various relevant quantities.
         """
-        x_pred, mask = self._shared_step(data)
+        x_pred, mask, cls = self._shared_step(data)
         (
             ae_loss,
             cls_loss,
@@ -262,7 +264,7 @@ class MAELitR(Model):
             cls_target,
             x_pred,
             x_true,
-        ) = self._compute_loss(data, x_pred, mask)
+        ) = self._compute_loss(data, x_pred, mask, cls)
         return {
             "loss": (ae_loss + cls_loss).to(torch.float32),
             "ae_loss": ae_loss.to(torch.float32),
@@ -315,41 +317,28 @@ class MAELitR(Model):
         return x, mask, ids_restore
 
     def decode(
-        self, data: Data, ids_restore: torch.Tensor, preds: torch.Tensor
+        self, data: Data, ids_restore: torch.Tensor, encoded_features: torch.Tensor
     ) -> torch.Tensor:
         """Decode procedure for MAE.
 
         Args:
             data: Data object.
-            ids_restore: Indicies to restore the original order of the data.
+            ids_restore: Indices to restore the original order of the data.
+            encoded_features: Encoded features.
 
         Returns:
             Decoded data in latent space.
         """
-        x = self.encode_decode_proj(preds)
+        projected_features = self.encode_decode_proj(encoded_features)
 
-        mask_tokens = self.mask_token.repeat(
-            x.shape[0], ids_restore.shape[1] - x.shape[1] + 1, 1
-        )
-        x_cls = x[:, :1, :]
-        x_no_cls = torch.cat([x[:, 1:, :], mask_tokens], dim=1)
-        x = torch.gather(
-            x_no_cls,
-            dim=1,
-            index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]),
-        )  # restore the original order
-        x = x + self.decode_pos_embedder(
-            torch.arange(x.shape[1], device=x.device)
-        )
-
-        x = torch.cat([x_cls, x_no_cls], dim=1)  # prepend cls token
+        x = self._undo_masking(data, projected_features)
         for blk in self.decoder_blocks:
             x = blk(x)
 
         return x
 
     def _compute_loss(
-        self, data: Data, x_pred: torch.Tensor, mask: torch.Tensor
+        self, data: Data, x_pred: torch.Tensor, mask: torch.Tensor, cls: torch.Tensor
     ) -> Tuple[
         torch.Tensor,
         torch.Tensor,
@@ -359,7 +348,7 @@ class MAELitR(Model):
         Dict[str, torch.Tensor],
     ]:
         x_true, padding_mask = utils.to_dense_batch(data.x, data.batch)
-        cls, x_pred = x_pred[:, 0, :], x_pred[:, 1:, :]
+        x_pred = x_pred[:, 1:, :]
 
         # Loss from auto-encoder
         if self.ae_loss is None:
@@ -404,6 +393,24 @@ class MAELitR(Model):
             ids_restore,
         )
 
+    def _undo_masking(self, data: Data, x: torch.Tensor):
+        ids_restore, _ = self._get_ids_restore_batch(data)
+        mask_tokens = self.mask_token.repeat(
+            x.shape[0], ids_restore.shape[1] - x.shape[1] + 1, 1
+        )
+        x_cls = x[:, :1, :]
+        x_no_cls = torch.cat([x[:, 1:, :], mask_tokens], dim=1)
+        x = torch.gather(
+            x_no_cls,
+            dim=1,
+            index=ids_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]),
+        )  # restore the original order
+        x = x + self.decode_pos_embedder(
+            torch.arange(x.shape[1], device=x.device)
+        )
+        x = torch.cat([x_cls, x_no_cls], dim=1)  # prepend cls token
+        return x
+
     def _get_ids_keep_batch(
         self, data: Data
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -432,3 +439,63 @@ class MAELitR(Model):
             )
             result.append(repeated_sequence)
         return torch.cat(result)
+
+
+class DOMAwareMAELit(MAELitR):
+    def __init__(
+            self,
+            extractor: Optional[nn.Module] = None,
+            model: Optional[nn.Module] = None,
+            ae_loss: Optional[nn.Module] = None,
+            cls_loss: Optional[nn.Module] = None,
+            optimizer_class: type = torch.optim.Adam,
+            optimizer_kwargs: Optional[Dict] = None,
+            scheduler_class: Optional[type] = None,
+            scheduler_kwargs: Optional[Dict] = None,
+            scheduler_config: Optional[Dict] = None,
+            *,
+            dim: int = 192,
+            dim_base: int = 128,
+            depth: int = 12,
+            head_size: int = 32,
+            depth_rel: int = 4,
+            decoder_depth: int = 2,
+            n_rel: int = 1,
+            in_dim: int = 7,
+            cls_loss_scale: float = 1.0,
+    ):
+        super().__init__(
+        extractor,
+        model,
+        ae_loss,
+        cls_loss,
+        optimizer_class,
+        optimizer_kwargs,
+        scheduler_class,
+        scheduler_kwargs,
+        scheduler_config,
+        dim=dim,
+        dim_base=dim_base,
+        depth=depth,
+        head_size=head_size,
+        depth_rel=depth_rel,
+        decoder_depth=decoder_depth,
+        n_rel=n_rel,
+        in_dim=in_dim,
+        cls_loss_scale=cls_loss_scale,
+    )
+        self.decode_extractor = PositionExtractor(dim_base, dim // 2)
+        self.encode_decode_proj2 = nn.Sequential(
+            nn.LayerNorm(dim), nn.Linear(dim, dim // 2)
+        )
+
+    def _undo_masking(self, data: Data, x: torch.Tensor):
+        x = super()._undo_masking(data, x)
+        x_orig, padding_mask = utils.to_dense_batch(data.x, data.batch)
+        x_orig = x_orig[..., :3]
+        # x_orig.shape
+        embedded_x_orig = self.decode_extractor(x_orig)
+        embedded_x_orig = torch.cat([x[:, :1, :], embedded_x_orig], dim=1)  # prepend cls token
+        x = torch.cat([embedded_x_orig, x], dim=2)
+        x = self.encode_decode_proj2(x)
+        return x
