@@ -1,4 +1,5 @@
 """Class containing a lightweight implementation of a standard module."""
+from logging import DEBUG
 from typing import Optional, Dict, List, Union, Any
 
 import torch
@@ -45,7 +46,7 @@ class LightweightModel(Model):
             state_dict_path: Path to state_dict_path to load the model weights.
         """
         # Base class constructor
-        super().__init__(name=__name__, class_name=self.__class__.__name__)
+        super().__init__(name=__name__, class_name=self.__class__.__name__, level=DEBUG)
 
         # Check(s)
         if isinstance(tasks, Task):
@@ -143,6 +144,32 @@ class LightweightModel(Model):
         )
         return {"loss": loss, "preds": preds}
 
+    def predict_step(self, predict_batch: Data, batch_idx: int) -> Dict[str, Any]:
+        preds = self._shared_step(predict_batch, batch_idx)
+        return {"preds": preds}
+
+    def configure_optimizers(self) -> Dict[str, Any]:
+        """Configure the model's optimizer(s)."""
+        optimizer = self._optimizer_class(
+            self.parameters(), **self._optimizer_kwargs
+        )
+        config = {
+            "optimizer": optimizer,
+        }
+        if self._scheduler_class is not None:
+            scheduler = self._scheduler_class(
+                optimizer, **self._scheduler_kwargs
+            )
+            config.update(
+                {
+                    "lr_scheduler": {
+                        "scheduler": scheduler,
+                        **self._scheduler_config,
+                    },
+                }
+            )
+        return config
+
     def _shared_step(
         self, batch: Data, batch_idx: int
     ) -> List[Union[Tensor, Data]]:
@@ -174,25 +201,3 @@ class LightweightModel(Model):
     def _get_batch_size(data: Data) -> int:
         """Get batch size."""
         return torch.numel(torch.unique(data.batch))
-
-    def configure_optimizers(self) -> Dict[str, Any]:
-        """Configure the model's optimizer(s)."""
-        optimizer = self._optimizer_class(
-            self.parameters(), **self._optimizer_kwargs
-        )
-        config = {
-            "optimizer": optimizer,
-        }
-        if self._scheduler_class is not None:
-            scheduler = self._scheduler_class(
-                optimizer, **self._scheduler_kwargs
-            )
-            config.update(
-                {
-                    "lr_scheduler": {
-                        "scheduler": scheduler,
-                        **self._scheduler_config,
-                    },
-                }
-            )
-        return config

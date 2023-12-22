@@ -17,7 +17,7 @@ class GraphnetCLI(LightningCLI):
         parser.add_subclass_arguments(
             GNN,
             "gnn",
-            help="The gnn used for the model.",
+            help="The main feature-learner used for the model.",
             required=True,
         )
         parser.add_subclass_arguments(
@@ -36,11 +36,6 @@ class GraphnetCLI(LightningCLI):
         # Link components to correct modules.
         parser.link_arguments(
             "graph_definition", "data.graph_definition", apply_on="instantiate"
-        )
-        parser.link_arguments(
-            "graph_definition",
-            "model.graph_definition",
-            apply_on="instantiate",
         )
         parser.link_arguments("gnn", "model.gnn", apply_on="instantiate")
         parser.link_arguments("tasks", "model.tasks", apply_on="instantiate")

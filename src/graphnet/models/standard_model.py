@@ -408,7 +408,7 @@ class StandardModel(Model):
         return results
 
     def _create_default_callbacks(self, val_dataloader: DataLoader) -> List:
-        callbacks = [ProgressBar()]
+        callbacks = [GNProgressBar()]
         callbacks = self._add_early_stopping(
             val_dataloader=val_dataloader, callbacks=callbacks
         )

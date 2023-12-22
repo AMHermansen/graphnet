@@ -7,11 +7,18 @@ from icecream import ic
 from torch import nn
 from torch_geometric.data import Data
 from torch_geometric.utils import to_dense_batch
+
 from .bept import TransformerBlock
-from torchmetrics import Accuracy
+from torchmetrics import Accuracy, JaccardIndex
 
 
-class CenterRegressionLoss(nn.Module):
+class ClsLoss(nn.Module, ABC):
+    def __init__(self):
+        super().__init__()
+        self.metrics = nn.ModuleDict({})
+
+
+class CenterRegressionLoss(ClsLoss):
     """Loss for the center regression task, of cls_token.
 
     Regression towards the mean of the x, y, z coordinates and the time
@@ -65,7 +72,7 @@ class CenterRegressionLoss(nn.Module):
         )
 
 
-class ClsCELoss(nn.Module):
+class ClsCELoss(ClsLoss):
     def __init__(self, latent_dim: int = 192, num_classes: int = 5484):
         super().__init__()
         self.latent_dim = latent_dim
@@ -96,6 +103,52 @@ class ClsCELoss(nn.Module):
             cls_event = cls_event.repeat(sensor_id_event.shape[0], 1)
             loss += self.loss(cls_event, sensor_id_event)
         return loss / cls.shape[0]  # Normalize loss per event
+
+
+class ClsFullBCEWithLogitsLoss(ClsLoss):
+    def __init__(self, latent_dim: int = 192, num_classes: int = 5484):
+        super().__init__()
+        self.latent_dim = latent_dim
+        self.num_classes = num_classes
+        self.proj = nn.Linear(latent_dim, num_classes)
+        self.loss = nn.BCEWithLogitsLoss()
+        iou = JaccardIndex(task="binary")
+        acc = Accuracy(task="binary")
+
+        self.metrics["iou"] = iou
+        self.metrics["acc"] = acc
+
+    def forward(
+        self,
+        cls: torch.Tensor,
+        data: Data,
+        ae_mask,
+    ):
+        sensor_id, _ = to_dense_batch(data.sensor_id, data.batch)
+        sensor_id = sensor_id.to(torch.int64)
+        cls = self.proj(cls)
+        loss = self.compute_loss(cls, sensor_id, ae_mask)
+        return loss, {"prediction_distribution": cls}, {"target": sensor_id}
+
+    def compute_loss(
+        self,
+        cls: torch.Tensor,
+        sensor_id: torch.Tensor,
+        ae_mask: torch.Tensor
+    ):
+        one_hot = self.one_hot_sensor(sensor_id, ae_mask).view(-1)
+        cls = cls.view(-1)
+        loss = self.loss(cls, one_hot)
+        self.metrics["iou"](cls, one_hot)
+        self.metrics["acc"](cls, one_hot)
+        return loss
+
+    def one_hot_sensor(self, sensor_id: torch.Tensor, ae_mask: torch.Tensor):
+        one_hot = torch.zeros(sensor_id.shape[0], self.num_classes)
+        events, lenghts = sensor_id.shape
+        for event in range(events):
+            one_hot[event, sensor_id[event][ae_mask[event]]] = 1
+        return one_hot
 
 
 class AELoss(nn.Module, ABC):
@@ -822,7 +875,7 @@ class TimeAE(AELoss):
 
         diff = pred - target
         loss = diff + nn.functional.softplus(-2.0 * diff)
-        return loss.mean() / 10.0
+        return loss.mean() * 10
 
     def forward(
             self,
@@ -843,4 +896,5 @@ class TimeAE(AELoss):
                 Returns: Tuple of loss, predictions and targets.
                 """
         x_pred = self.proj(x_latent)
-        return self.compute_loss(x_pred, x_true, mask, data), x_pred, x_true
+        return self.compute_loss(x_pred, x_true, mask, data), {"x_pred": x_pred}, {
+            "x_true": x_true}

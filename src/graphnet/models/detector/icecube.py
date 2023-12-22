@@ -1,6 +1,8 @@
 """IceCube-specific `Detector` class(es)."""
 
-from typing import Dict, Callable
+from typing import Dict, Callable, Optional, Tuple, List
+
+import numpy as np
 import torch
 import os
 
@@ -19,6 +21,7 @@ class IceCube86(Detector):
         time_scaling: float = 3.0e4,
         time_offset: float = 1.0e04,
         space_scaling: float = 500.0,
+        clip_range: Optional[List[Optional[float]]] = (-1., 1.),
     ):
         """Construct IceCube86 detector.
 
@@ -31,13 +34,13 @@ class IceCube86(Detector):
             space_scaling: Scaling for all space coordinates.
         """
         super().__init__()
-
         self._space_scaling = space_scaling
         self._time_offset = time_offset
         self._time_scaling = time_scaling
         self._rde_offset = rde_offset
         self._rde_scaling = rde_scaling
         self._pmt_scaling = pmt_scaling
+        self.clip_range = clip_range
 
     geometry_table_path = os.path.join(
         "/lustre/hpc/icecube/andreash/workspace/graphnet/data/geometry_tables/icecube/icecube86_good.parquet"
@@ -60,10 +63,10 @@ class IceCube86(Detector):
         return feature_map
 
     def _dom_xyz(self, x: torch.tensor) -> torch.tensor:
-        return x / self._space_scaling
+        return np.clip(x / self._space_scaling, *self.clip_range)
 
     def _dom_time(self, x: torch.tensor) -> torch.tensor:
-        return (x - self._time_offset) / self._time_scaling
+        return np.clip((x - self._time_offset) / self._time_scaling, *self.clip_range)
 
     def _charge(self, x: torch.tensor) -> torch.tensor:
         return torch.log10(x)

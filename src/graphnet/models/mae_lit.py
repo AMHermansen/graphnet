@@ -1,4 +1,5 @@
 """Masked Auto Encoder model."""
+from itertools import chain
 from typing import Optional, Dict, Any, List, Tuple
 
 from icecream import ic
@@ -161,7 +162,7 @@ class MAELitR(Model):
     def on_train_epoch_end(self):
         if self.ae_loss is None:
             return
-        for name, metric in self.ae_loss.metrics.items():
+        for name, metric in chain(self.ae_loss.metrics.items(), self.cls_loss.metrics.items()):
             self.log(
                 f"train_{name}",
                 metric.compute(),
@@ -170,7 +171,6 @@ class MAELitR(Model):
                 on_step=False,
                 sync_dist=True,
             )
-            metric.reset()
 
     def validation_step(
         self, data: Data, batch_idx: int
@@ -233,7 +233,7 @@ class MAELitR(Model):
     def on_validation_epoch_end(self):
         if self.ae_loss is None:
             return
-        for name, metric in self.ae_loss.metrics.items():
+        for name, metric in chain(self.ae_loss.metrics.items(), self.cls_loss.metrics.items()):
             self.log(
                 f"val_{name}",
                 metric.compute(),
@@ -357,6 +357,7 @@ class MAELitR(Model):
             x_true = {"true_orig": x_true}
         else:
             ae_loss, x_pred, x_true = self.ae_loss(x_pred, x_true, mask, data)
+
 
         # Loss from CLS token
         if self.cls_loss is None:

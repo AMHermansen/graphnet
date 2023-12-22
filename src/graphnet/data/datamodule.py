@@ -4,6 +4,7 @@ from itertools import chain
 from typing import Union, List, Dict, Optional, Callable, Any
 
 import numpy as np
+import pandas as pd
 from lightning import LightningDataModule
 from lightning.pytorch.utilities.types import (
     TRAIN_DATALOADERS,
@@ -75,16 +76,12 @@ class SQLiteDataModule(Logger, LightningDataModule):
 
         if isinstance(selection, Sequence) and isinstance(selection[0], str):
             selection = {
-                k: np.genfromtxt(selection_path, dtype=np.int32).tolist()
-                if selection_path[-4:] != ".csv"
-                else selection_path
-                for selection_path, k in zip(
-                    selection, ["train", "val", "test"]
-                )
+                k: self._process_selection(v)
+                for k, v in zip(["train", "val", "test"], selection)
             }
         if isinstance(selection, Dict) and isinstance(selection["train"], str):
             selection = {
-                k: np.genfromtxt(v, dtype=np.int32).tolist()
+                k: self._process_selection(v)
                 for k, v in selection.items()
             }
 
@@ -122,7 +119,7 @@ class SQLiteDataModule(Logger, LightningDataModule):
             labels=self._labels,
         )
 
-        self.save_hyperparametrs(ignore=["graph_definition"])
+        self.save_hyperparameters(ignore=["graph_definition"])
         self._selection = selection
 
         self._all_keys = self._get_unique_keys(
@@ -154,6 +151,16 @@ class SQLiteDataModule(Logger, LightningDataModule):
     @staticmethod
     def _get_unique_keys(*dicts: Dict[Any, Any]) -> List[Any]:
         return list(set(chain.from_iterable(sub.keys() for sub in dicts)))
+
+    @staticmethod
+    def _process_selection(sel: str) -> Union[List[int], str]:
+        if sel[-4:] == ".csv":
+            return pd.read_csv(sel).reset_index(drop=True)['event_no'].ravel().tolist()
+        elif sel[-8:] == ".parquet":
+            return pd.read_parquet(sel).reset_index(drop=True)['event_no'].ravel().tolist()
+        else:
+            return sel
+
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         """Create train dataloader."""
@@ -190,3 +197,5 @@ class SQLiteDataModule(Logger, LightningDataModule):
             shuffle=False,
             **self._common_kwargs,  # type: ignore
         )
+
+    predict_dataloader = test_dataloader

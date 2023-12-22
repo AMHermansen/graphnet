@@ -1,5 +1,6 @@
 """Callbacks to write results to disk."""
 import os
+import warnings
 from abc import abstractmethod, ABC
 from itertools import chain
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Optional, List, Dict, Any, Union, TYPE_CHECKING
 import numpy as np
 import pandas as pd
 import torch
+from icecream import ic
 from lightning import Callback, Trainer, LightningModule
 from lightning.pytorch.callbacks import BasePredictionWriter
 from torch_geometric.data import Batch, Data
@@ -18,12 +20,13 @@ if TYPE_CHECKING:
     from graphnet.models.lightweight_model import LightweightModel  # type: ignore[attr-defined]
 
 
-class BaseCacheValWriter(Callback, ABC):
+class BaseCacheWriter(Callback, ABC):
     """Callback to write validation predictions to internal cache."""
 
     def __init__(
         self,
-        output_dir: Union[str, Path],
+        stage: Optional[str] = "validation",
+        output_dir: Optional[Union[str, Path]] = None,
         results_folder: str = "results",
         output_file_prefix: str = "validation_result_",
         additional_attributes: Optional[List[str]] = None,
@@ -42,21 +45,35 @@ class BaseCacheValWriter(Callback, ABC):
             val_epoch_frequency: Frequency of writing. Defaults to 1 i.e. every epoch is written.
             overwrite_results_folder: If true, might overwrite existing folder.
         """
-        if results_folder:
-            output_dir = os.path.join(output_dir, results_folder)
+        self.stage = stage
+        self._overwrite_results_folder = overwrite_results_folder
         self._output_dir = output_dir
-        os.makedirs(self._output_dir, exist_ok=overwrite_results_folder)
+        self._results_folder = results_folder
         self._output_file_prefix = output_file_prefix
         self._additional_attributes = additional_attributes or []
         self._prediction_labels = prediction_labels
         self._val_epoch_frequency = val_epoch_frequency
         self._cache: Dict[str, List] = {}
 
+        if self.stage not in ["validation", "predict"]:
+            raise ValueError(
+                f"stage must be either 'validation' or 'predict', got {self.stage}"
+            )
+
+    def setup(self, trainer: Trainer, model: "LightweightModel", stage: str) -> None:
+        if self._output_dir is None:
+            self._output_dir = trainer.default_root_dir
+        if self._results_folder:
+            self._output_dir = os.path.join(self._output_dir, self._results_folder)
+        os.makedirs(self._output_dir, exist_ok=self._overwrite_results_folder)
+        self._reset_cache(model)
+
     def on_fit_start(
         self, trainer: Trainer, model: "LightweightModel"
     ) -> None:
         """Reset cache."""
-        self._reset_cache(model)
+        if self.stage == "validation":
+            self._reset_cache(model)
 
     def on_validation_batch_end(
         self,
@@ -68,6 +85,8 @@ class BaseCacheValWriter(Callback, ABC):
         dataloader_idx: int = 0,
     ) -> None:
         """Write results to cache if relevant epoch."""
+        if self.stage != "validation":
+            return
         if (
             trainer.current_epoch % self._val_epoch_frequency
             == self._val_epoch_frequency - 1
@@ -81,7 +100,7 @@ class BaseCacheValWriter(Callback, ABC):
         if (
             trainer.current_epoch % self._val_epoch_frequency
             == self._val_epoch_frequency - 1
-        ):
+        ) and self.stage == "validation":
             self._write_cache_to_disk(
                 os.path.join(
                     self._output_dir,
@@ -90,6 +109,34 @@ class BaseCacheValWriter(Callback, ABC):
                 trainer,
                 model,
             )
+        self._reset_cache(model)
+
+    def on_predict_batch_end(
+        self,
+        trainer: "Trainer",
+        model: "LightningModule",
+        outputs: Any,
+        batch: Any,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+        if self.stage != "predict":
+            return
+        self._write_to_cache(outputs, batch, model)
+
+    def on_predict_epoch_end(
+        self, trainer: "Trainer", model: "LightweightModel",
+    ):
+        if self.stage != "predict":
+            return
+        self._write_cache_to_disk(
+            os.path.join(
+                self._output_dir,
+                f"{self._output_file_prefix}"
+            ),
+            trainer,
+            model,
+        )
         self._reset_cache(model)
 
     def _reset_cache(self, model: "LightweightModel") -> None:
@@ -105,7 +152,8 @@ class BaseCacheValWriter(Callback, ABC):
     def _write_to_cache(
         self, outputs: Any, batch: Batch, model: "LightweightModel"
     ) -> None:
-        outputs = outputs["preds"][0]
+        model.debug("Writing to cache")
+        outputs = outputs["preds"][0]  # might need to only select [0] for some models
         for idx, pred_label in enumerate(chain(model.prediction_labels)):
             self._cache[pred_label].extend(outputs[:, idx].tolist())
         for idx, attribute in enumerate(self._additional_attributes):
@@ -124,8 +172,30 @@ class BaseCacheValWriter(Callback, ABC):
         pass
 
 
-class WriteValToParquet(BaseCacheValWriter):
+class WriteToParquet(BaseCacheWriter):
     """Callback to write validation predictions parquet file."""
+
+    def __init__(
+            self,
+            stage: Optional[str] = "validation",
+            output_dir: Optional[Union[str, Path]] = None,
+            results_folder: str = "results",
+            output_file_prefix: str = "validation_result_",
+            additional_attributes: Optional[List[str]] = None,
+            prediction_labels: Optional[List[str]] = None,
+            val_epoch_frequency: int = 1,
+            overwrite_results_folder: bool = False,
+    ):
+        super().__init__(
+            stage=stage,
+            output_dir=output_dir,
+            results_folder=results_folder,
+            output_file_prefix=output_file_prefix,
+            additional_attributes=additional_attributes,
+            prediction_labels=prediction_labels,
+            val_epoch_frequency=val_epoch_frequency,
+            overwrite_results_folder=overwrite_results_folder,
+        )
 
     @property
     def file_extension(self) -> str:
@@ -133,9 +203,18 @@ class WriteValToParquet(BaseCacheValWriter):
         return ".parquet"
 
     def _write_cache_to_disk(
-        self, filename: str, trainer: Trainer, model: "LightweightModel"
+            self, filename: str, trainer: Trainer, model: "LightweightModel"
     ) -> None:
         pd.DataFrame(self._cache).to_parquet(filename)
+
+
+class WriteValToParquet(WriteToParquet):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "WriteValToParquet is deprecated, use WriteToParquet instead",
+            DeprecationWarning,
+        )
+        super().__init__(*args, **kwargs)
 
 
 class WriteValToParquetWithPlot(WriteValToParquet):

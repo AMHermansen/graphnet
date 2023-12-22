@@ -549,10 +549,14 @@ class Dataset(
                 pulsemap, self._features, sequential_index, self._selection
             )
             features.extend(features_pulsemap)
-
-        truth: Tuple[Any, ...] = self.query_table(
-            self._truth_table, self._truth, sequential_index
-        )[0]
+        try:
+            truth: Tuple[Any, ...] = self.query_table(
+                self._truth_table, self._truth, sequential_index
+            )[0]
+        except IndexError:
+            self.warning(f"Index error found in truth table for values: {self._truth_table}, {self._truth}, {sequential_index}")
+            truth = tuple([0 for _ in self._truth])
+            pass
         if self._node_truth:
             assert self._node_truth_table is not None
             node_truth = self.query_table(

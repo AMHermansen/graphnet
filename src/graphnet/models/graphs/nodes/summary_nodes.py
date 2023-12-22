@@ -148,7 +148,6 @@ class MircoSummaryNodes(NodeDefinition):
         self, x: torch.Tensor
     ) -> Dict[Tuple, np.ndarray]:
         x = x.numpy()
-        ic(x)
         x_sort = x
         sorted_indices = np.lexsort(x_sort)
         dom_time_series: Dict[Tuple, Union[List[np.ndarray], np.ndarray]] = {}
@@ -160,6 +159,5 @@ class MircoSummaryNodes(NodeDefinition):
             else:
                 dom_time_series[dom_key] = [x[idx, :]]
         for key in dom_time_series:
-            ic(dom_time_series[key])
             dom_time_series[key] = np.array(dom_time_series[key])
         return dom_time_series

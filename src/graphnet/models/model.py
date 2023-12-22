@@ -6,6 +6,7 @@ import os.path
 from typing import Any, Dict, List, Optional, Union
 
 import torch
+from icecream import ic
 from lightning import LightningModule
 from torch_geometric.data import Data
 
@@ -49,7 +50,10 @@ class Model(
             self.info(
                 "It is recommended to use the .pth suffix for state_dict files."
             )
-        torch.save(self.cpu().state_dict(), path)
+        state_dict = self.state_dict()
+        for key, value in state_dict.items():
+            state_dict[key] = value.cpu()
+        torch.save(state_dict, path)
         self.info(f"Model state_dict saved to {path}")
 
     def load_state_dict(
@@ -57,6 +61,7 @@ class Model(
     ) -> "Model":  # pylint: disable=arguments-differ
         """Load model `state_dict` from `path`."""
         if isinstance(path, str):
+            self.info(f"Model loaded state_dict from {path}")
             state_dict = torch.load(path)
         else:
             state_dict = path
