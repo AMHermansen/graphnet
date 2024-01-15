@@ -249,7 +249,7 @@ class BinaryCrossEntropyWithLogitsLoss(LossFunction):
 
     def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
         return binary_cross_entropy_with_logits(
-            prediction.float(), target.float(), reduction="none"
+            prediction.view(-1, 1).float(), target.view(-1, 1).float(), reduction="none"
         )
 
 

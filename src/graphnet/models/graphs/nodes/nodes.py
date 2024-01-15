@@ -179,7 +179,7 @@ class MaxNodesAsPulses(NodesAsPulses):
     def _construct_nodes(
         self, x: torch.Tensor, include_sensor_id: bool = False
     ) -> Tuple[Data, List[str]]:
-        return Data(x=x[: self.max_length])
+        return super()._construct_nodes(x=x[: self.max_length], include_sensor_id=include_sensor_id)
 
 
 class MAENodes(NodesAsPulses):

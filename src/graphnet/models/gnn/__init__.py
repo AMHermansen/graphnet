@@ -6,3 +6,4 @@ from .dynedge_jinst import DynEdgeJINST
 from .dynedge_kaggle_tito import DynEdgeTITO
 from .odynedge import ODynEdge
 from .gnn import GNN
+from .gn_mamba import MambaStacked

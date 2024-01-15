@@ -6,5 +6,6 @@ from .write import (
     WriteValToParquetWithPlot,
     WriteToParquet,
     MAEWriteCB,
+    WriteBatchToNumpy,
 )
 from .early_stopping import GraphnetEarlyStopping

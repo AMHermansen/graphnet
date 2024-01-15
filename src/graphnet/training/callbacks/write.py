@@ -17,7 +17,7 @@ import torch_geometric
 
 
 if TYPE_CHECKING:
-    from graphnet.models.lightweight_model import LightweightModel  # type: ignore[attr-defined]
+    from graphnet.models.lightweight_model import LightweightModel, Model  # type: ignore[attr-defined]
 
 
 class BaseCacheWriter(Callback, ABC):
@@ -152,7 +152,6 @@ class BaseCacheWriter(Callback, ABC):
     def _write_to_cache(
         self, outputs: Any, batch: Batch, model: "LightweightModel"
     ) -> None:
-        model.debug("Writing to cache")
         outputs = outputs["preds"][0]  # might need to only select [0] for some models
         for idx, pred_label in enumerate(chain(model.prediction_labels)):
             self._cache[pred_label].extend(outputs[:, idx].tolist())
@@ -351,3 +350,55 @@ class MAEWriteCB(BasePredictionWriter):
     def _save_dict(dict, path):
         for k, v in dict.items():
             np.save(f"{path}_{k}.npy", v)
+
+
+class WriteBatchToNumpy(BasePredictionWriter):
+    def __init__(self, output_dir: Optional[str] = None):
+        """Initialize callback.
+
+        Args:
+            output_dir: Directory to write results to.
+        """
+        super().__init__("batch")
+        self.output_dir = output_dir
+
+    def setup(self, trainer: "pl.Trainer", model: "Model", stage: str) -> None:
+        if not self.output_dir:
+            self.output_dir = trainer.default_root_dir
+        os.makedirs(self.output_dir, exist_ok=True)
+        model.info(f"Saving outputs to {self.output_dir}/results/")
+
+    def _write(self, result_dict: Dict[str, Union[Dict, torch.Tensor]], batch_no: int, model: "Model", path: str):
+        os.makedirs(path, exist_ok=True)
+        for key, value in result_dict.items():
+            if not isinstance(key, str):
+                model.warning_once(f"Found key: {key} in results dict. Corresponding values not saved")
+            if isinstance(value, torch.Tensor):
+                value = value.detach().cpu().to(torch.float32).numpy()
+                np.save(f"{path}/{key}.npy", value)
+            elif isinstance(value, dict):
+                self._write(result_dict=value, batch_no=batch_no, model=model, path=f"{path}/key")
+            else:
+                # Shouldn't reach this
+                model.warning_once(f"Unknown value for {key = }, {type(value) = }")
+
+    def write_on_batch_end(
+            self,
+            trainer: Trainer,
+            model: "Model",
+            prediction: Dict[str, Any],
+            batch_indices: Any,  # Don't know what this is...
+            batch: Data,
+            batch_idx: int,
+            dataloader_idx: int = 0,
+    ) -> None:
+        # Initial recursive call.
+        path = f"{self.output_dir}/results/batch{batch_idx}"
+        self._write(result_dict=prediction, batch_no=batch_idx, model=model, path=path)
+        x_true, padding_mask = torch_geometric.utils.to_dense_batch(
+            batch.x, batch.batch
+        )
+        x_true = x_true.detach().cpu().numpy()
+        padding_mask = padding_mask.detach().cpu().numpy()
+        np.save(f"{path}/x_true.npy", x_true)
+        np.save(f"{path}/padding_mask.npy", padding_mask)

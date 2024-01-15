@@ -196,8 +196,3 @@ class LightweightModel(Model):
             loss.dim() == 0 for loss in losses
         ), "Please reduce loss for each task separately"
         return torch.mean(torch.stack(losses))
-
-    @staticmethod
-    def _get_batch_size(data: Data) -> int:
-        """Get batch size."""
-        return torch.numel(torch.unique(data.batch))

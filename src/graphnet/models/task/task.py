@@ -2,16 +2,16 @@
 
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, List, Tuple, Union
-from typing import Callable, Optional
+from typing import Any, TYPE_CHECKING, List, Tuple, Union, Callable, Optional, Dict, \
+    Type
 import numpy as np
 import pandas as pd
 
 import torch
-import typing
 from torch import Tensor
 from torch.nn import Linear
 from torch_geometric.data import Data
+from torchmetrics import Metric
 
 if TYPE_CHECKING:
     # Avoid cyclic dependency
@@ -40,6 +40,10 @@ class Task(Model):
     def default_prediction_labels(self) -> List[str]:
         """Return default prediction labels."""
         return self._default_prediction_labels
+
+    @property
+    def default_metrics(self) -> Dict[str, Tuple[Union[Type[Metric], Callable[[], Metric]], bool]]:
+        return {}
 
     def plot(
         self,
@@ -77,6 +81,8 @@ class Task(Model):
         transform_inference: Optional[Union[Callable, str]] = None,
         transform_support: Optional[Union[Callable, str]] = None,
         loss_weight: Optional[Union[Callable, str]] = None,
+        train_metrics: Optional[Dict[str, Tuple[Metric, bool]]] = None,
+        val_metrics: Optional[Dict[str, Tuple[Metric, bool]]] = None,
     ):
         """Construct `Task`.
 
@@ -120,6 +126,22 @@ class Task(Model):
         # Check(s)
         if target_labels is None:
             target_labels = self.default_target_labels
+
+        if train_metrics is None:
+            train_metrics, train_metrics_log = self._instantiate_metrics(prefix="val_")
+        else:
+            train_metrics, train_metrics_log = self._split_metric_dict(train_metrics)
+
+        if val_metrics is None:
+            val_metrics, val_metrics_log = self._instantiate_metrics(prefix="val_")
+        else:
+            val_metrics, val_metrics_log = self._split_metric_dict(val_metrics)
+
+        self.train_metrics = train_metrics
+        self.train_metrics_log = train_metrics_log
+        self.val_metrics = val_metrics
+        self.val_metrics_log = val_metrics_log
+
         if isinstance(target_labels, str):
             target_labels = [target_labels]
 
@@ -140,6 +162,8 @@ class Task(Model):
         self._loss_function = loss_function
         self._inference = False
         self._loss_weight = loss_weight
+
+
 
         self._transform_prediction_training: Callable[
             [Tensor], Tensor
@@ -302,6 +326,23 @@ class Task(Model):
                 self._transform_target = transform_target
             if transform_inference is not None:
                 self._transform_prediction_inference = transform_inference
+
+    @staticmethod
+    def _split_metric_dict(metric_dict: Dict[str, Tuple[Metric, bool]]):
+        metrics = {}
+        log_metrics = {}
+        for key, value in metric_dict.items():
+            metrics[key] = value[0]
+            log_metrics[key] = value[1]
+        return metrics, log_metrics
+
+    def _instantiate_metrics(self, prefix) -> Tuple[Dict[str, Metric], Dict[str, bool]]:
+        metrics = {}
+        log_metrics = {}
+        for key, value in self.default_metrics.items():
+            metrics[f"{prefix}_{key}"] = value[0]()
+            log_metrics[f"{prefix}_{key}"] = value[1]
+        return metrics, log_metrics
 
 
 class IdentityTask(Task):

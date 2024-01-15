@@ -24,8 +24,9 @@ class Model(
     """Base class for all components in graphnet."""
 
     @staticmethod
-    def _get_batch_size(data: List[Data]) -> int:
-        return sum([torch.numel(torch.unique(d.batch)) for d in data])
+    def _get_batch_size(data: Data) -> int:
+        """Get batch size."""
+        return torch.numel(torch.unique(data.batch))
 
     def save(self, path: str) -> None:
         """Save entire model to `path`."""

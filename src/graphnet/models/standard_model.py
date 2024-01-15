@@ -29,6 +29,10 @@ class StandardModel(Model):
     read-outs).
     """
 
+    @staticmethod
+    def _get_batch_size(data: List[Data]) -> int:
+        return sum([torch.numel(torch.unique(d.batch)) for d in data])
+
     def __init__(
         self,
         *,

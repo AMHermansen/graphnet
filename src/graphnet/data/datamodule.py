@@ -119,7 +119,7 @@ class SQLiteDataModule(Logger, LightningDataModule):
             labels=self._labels,
         )
 
-        self.save_hyperparameters(ignore=["graph_definition"])
+        # self.save_hyperparameters(ignore=["graph_definition"])
         self._selection = selection
 
         self._all_keys = self._get_unique_keys(
@@ -157,10 +157,9 @@ class SQLiteDataModule(Logger, LightningDataModule):
         if sel[-4:] == ".csv":
             return pd.read_csv(sel).reset_index(drop=True)['event_no'].ravel().tolist()
         elif sel[-8:] == ".parquet":
-            return pd.read_parquet(sel).reset_index(drop=True)['event_no'].ravel().tolist()
+            return pd.read_parquet(sel)["event_no"].tolist()
         else:
             return sel
-
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         """Create train dataloader."""

@@ -461,8 +461,8 @@ class Extractor(nn.Module):
         """Initialize the Extractor module.
 
         Args:
-            dim_base: Base dimension of the model.
-            dim: Core dimension of the model.
+            dim_base: Latent dimension of the extractor.
+            dim: Out dimension of the extractor.
         """
         super().__init__()
         self.emb = SinusoidalPosEmb(dim=dim_base)
@@ -505,6 +505,22 @@ class Extractor(nn.Module):
         )
         x = self.proj(x)
         return x
+
+
+class SimpleExtractor(nn.Module):
+
+    def __init__(self, dim_base: int, dim, ):
+        super().__init__()
+        self.proj1 = nn.Linear(7, 7*dim_base)
+        self.activation = nn.GELU()
+        self.norm = nn.LayerNorm(7*dim_base)
+        self.proj2 = nn.Linear(7*dim_base, dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.proj1(x)
+        x = self.activation(x)
+        x = self.norm(x)
+        return self.proj2(x)
 
 
 class PositionExtractor(nn.Module):

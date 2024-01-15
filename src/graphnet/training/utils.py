@@ -122,6 +122,8 @@ def make_dataloader(
         collate_fn=collate_fn,
         persistent_workers=persistent_workers,
         prefetch_factor=2,
+        pin_memory=True,
+        timeout=500,
     )
 
     return dataloader

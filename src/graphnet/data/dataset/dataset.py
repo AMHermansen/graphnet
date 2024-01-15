@@ -670,6 +670,7 @@ class Dataset(
                 ),
                 "dbang": self._get_dbang_label(truth_dict),
                 "corsika": int(abs_pid > 20),
+                "is_data": int(sim_type == "data"),
             }
         else:
             labels_dict = {
