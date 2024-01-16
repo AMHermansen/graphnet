@@ -357,8 +357,8 @@ class VonMisesFisherLoss(LossFunction):
     ) -> Tensor:  # pylint: disable=invalid-name
         """Calculate $log C_{m}(k)$ term in von Mises-Fisher loss.
 
-        Since `log_cmk_exact` is diverges for `kappa` >~ 700 (using
-        float64 precision), and since `log_cmk_approx` is unaccurate for
+        Since `log_cmk_exact` diverges for `kappa` >~ 700 (using
+        float64 precision), and since `log_cmk_approx` is innaccurate for
         small `kappa`, this method automatically switches between the
         two at `kappa_switch`, ensuring continuity at this point.
         """
@@ -445,6 +445,18 @@ class VonMisesFisher2DLoss(VonMisesFisherLoss):
         )
 
         return self._evaluate(p, t)
+
+
+class ZenithAdjustedVMF(VonMisesFisher2DLoss):
+    def _forward(self, predictions: torch.Tensor, target: torch.Tensor):
+        return super()._forward(predictions, target) + super()._forward(predictions, 2 * torch.pi - target)
+
+
+# Theoretically motivated, since the limit where kappa -> inf reduces to a flat distribution.
+class CosZenithAdjustedVMF(ZenithAdjustedVMF):
+    def _forward(self, predictions: torch.Tensor, target: torch.Tensor):
+        target = (torch.cos(target)) * (torch.pi / 2.)
+        super()._forward(predictions, target)
 
 
 class EuclideanDistanceLoss(LossFunction):
