@@ -1,6 +1,6 @@
 """Bases for all configurable classes in  `graphnet`."""
 
-from abc import ABC, abstractclassmethod
+from abc import ABC, abstractclassmethod, abstractmethod
 from typing import Any, Union
 
 from graphnet.utilities.config.base_config import BaseConfig
@@ -34,7 +34,8 @@ class Configurable(ABC):
         """Save Config to `path` as YAML file."""
         self.config.dump(path)
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def from_config(cls, source: Union[BaseConfig, str]) -> Any:
         """Construct instance from `source` configuration."""
 
