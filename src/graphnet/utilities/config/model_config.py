@@ -134,6 +134,11 @@ class ModelConfig(BaseConfig):
             self._deserialise,
             fn_kwargs={"trust": trust},
         )
+        if self.class_name.startswith("!external") and trust:
+            module, class_name = self.class_name.split()[1:]
+            print(module, class_name)
+            exec(f"from {module} import {class_name}")
+            return eval(class_name)
 
         # Construct model based on arguments
         return namespace_classes[self.class_name](**arguments)
@@ -194,7 +199,18 @@ class ModelConfig(BaseConfig):
                 )
         elif isinstance(obj, str) and obj.startswith("torch"):
             return eval(obj)
-
+        elif isinstance(obj, str) and obj.startswith("!external"):
+            if trust:
+                module, class_name = obj.split()[1:]
+                exec(f"from {module} import {class_name}")
+                return eval(class_name)
+            else:
+                raise ValueError(
+                    f"Constructing model containing an external class ({obj}) with "
+                    "`trust=False`. If you trust the class definitions in "
+                    "this ModelConfig, set `trust=True` and reconstruct the "
+                    "model again."
+                )
         else:
             return obj
 
@@ -326,5 +342,4 @@ class ModelConfigSaverMeta(type):
 
 class ModelConfigSaverABC(ModelConfigSaverMeta, ABCMeta):
     """Common interface between ModelConfigSaver and ABC Metaclasses."""
-
     pass
