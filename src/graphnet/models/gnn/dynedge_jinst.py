@@ -29,6 +29,9 @@ class DynEdgeJINST(GNN):
             nb_outputs: Number of output features.
             layer_size_scale: Integer that scales the size of hidden layers.
         """
+        self.warning("DynEdgeJINST has not been refactored to new GNN/RawGNN structure. "
+                     "Proceed at own caution.")
+
         # Architecture configuration
         c = layer_size_scale
         l1, l2, l3, l4, l5, l6 = (
@@ -41,7 +44,7 @@ class DynEdgeJINST(GNN):
         )
 
         # Base class constructor
-        super().__init__(nb_inputs, [l6])
+        super().__init__()
 
         # Graph convolutional operations
         features_subset = slice(0, 3)

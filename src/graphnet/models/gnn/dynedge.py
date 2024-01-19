@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 from torch_scatter import scatter_max, scatter_mean, scatter_min, scatter_sum
 
 from graphnet.models.components.layers import DynEdgeConv
-from graphnet.models.gnn.gnn import GNN
+from graphnet.models.gnn.gnn import GNN, RawGNN
 from graphnet.models.utils import calculate_xyzt_homophily
 
 GLOBAL_POOLINGS = {
@@ -18,7 +18,7 @@ GLOBAL_POOLINGS = {
 }
 
 
-class DynEdge(GNN):
+class DynEdge(RawGNN):
     """DynEdge (dynamical edge convolutional) model."""
 
     def __init__(
@@ -29,9 +29,7 @@ class DynEdge(GNN):
         features_subset: Optional[Union[List[int], slice]] = None,
         dynedge_layer_sizes: Optional[List[Tuple[int, ...]]] = None,
         post_processing_layer_sizes: Optional[List[int]] = None,
-        readout_layer_sizes: Optional[List[int]] = None,
-        global_pooling_schemes: Optional[Union[str, List[str]]] = None,
-        add_global_variables_after_pooling: bool = False,
+        add_global_variables_to_nodes: bool = True,
     ):
         """Construct `DynEdge`.
 
@@ -113,46 +111,11 @@ class DynEdge(GNN):
         assert all(size > 0 for size in post_processing_layer_sizes)
 
         self._post_processing_layer_sizes = post_processing_layer_sizes
-
-        # Read-out layer sizes
-        if readout_layer_sizes is None:
-            readout_layer_sizes = [
-                128,
-            ]
-
-        assert isinstance(readout_layer_sizes, list)
-        assert len(readout_layer_sizes)
-        assert all(size > 0 for size in readout_layer_sizes)
-
-        self._readout_layer_sizes = readout_layer_sizes
-
-        # Global pooling scheme(s)
-        if isinstance(global_pooling_schemes, str):
-            global_pooling_schemes = [global_pooling_schemes]
-
-        if isinstance(global_pooling_schemes, list):
-            for pooling_scheme in global_pooling_schemes:
-                assert (
-                    pooling_scheme in GLOBAL_POOLINGS
-                ), f"Global pooling scheme {pooling_scheme} not supported."
-        else:
-            assert global_pooling_schemes is None
-
-        self._global_pooling_schemes = global_pooling_schemes
-
-        if add_global_variables_after_pooling:
-            assert self._global_pooling_schemes, (
-                "No global pooling schemes were request, so cannot add global"
-                " variables after pooling."
-            )
-        self._add_global_variables_after_pooling = (
-            add_global_variables_after_pooling
-        )
-
         # Base class constructor
-        super().__init__(nb_inputs, self._readout_layer_sizes)
+        super().__init__()
 
         # Remaining member variables()
+        self._add_global_variables_to_nodes = add_global_variables_to_nodes
         self._activation = torch.nn.LeakyReLU()
         self._nb_inputs = nb_inputs
         self._nb_global_variables = 5 + nb_inputs
@@ -161,11 +124,19 @@ class DynEdge(GNN):
 
         self._construct_layers()
 
+    @property
+    def nb_inputs(self):
+        return self._nb_inputs
+
+    @property
+    def nb_outputs(self) -> int:
+        return self._dynedge_layer_sizes[-1][-1]
+
     def _construct_layers(self) -> None:
         """Construct layers (torch.nn.Modules)."""
         # Convolutional operations
         nb_input_features = self._nb_inputs
-        if not self._add_global_variables_after_pooling:
+        if self._add_global_variables_to_nodes:
             nb_input_features += self._nb_global_variables
 
         self._conv_layers = torch.nn.ModuleList()
@@ -207,45 +178,12 @@ class DynEdge(GNN):
 
         self._post_processing = torch.nn.Sequential(*post_processing_layers)
 
-        # Read-out operations
-        nb_poolings = (
-            len(self._global_pooling_schemes)
-            if self._global_pooling_schemes
-            else 1
-        )
-        nb_latent_features = nb_out * nb_poolings
-        if self._add_global_variables_after_pooling:
-            nb_latent_features += self._nb_global_variables
-
-        readout_layers = []
-        layer_sizes = [nb_latent_features] + list(self._readout_layer_sizes)
-        for nb_in, nb_out in zip(layer_sizes[:-1], layer_sizes[1:]):
-            readout_layers.append(torch.nn.Linear(nb_in, nb_out))
-            readout_layers.append(self._activation)
-
-        self._readout = torch.nn.Sequential(*readout_layers)
-
-    def _global_pooling(self, x: Tensor, batch: LongTensor) -> Tensor:
-        """Perform global pooling."""
-        assert self._global_pooling_schemes
-        pooled = []
-        for pooling_scheme in self._global_pooling_schemes:
-            pooling_fn = GLOBAL_POOLINGS[pooling_scheme]
-            pooled_x = pooling_fn(x, index=batch, dim=0)
-            if isinstance(pooled_x, tuple) and len(pooled_x) == 2:
-                # `scatter_{min,max}`, which return also an argument, vs.
-                # `scatter_{mean,sum}`
-                pooled_x, _ = pooled_x
-            pooled.append(pooled_x)
-
-        return torch.cat(pooled, dim=1)
-
+    @staticmethod
     def _calculate_global_variables(
-        self,
-        x: Tensor,
-        edge_index: LongTensor,
-        batch: LongTensor,
-        *additional_attributes: Tensor,
+            x: Tensor,
+            edge_index: LongTensor,
+            batch: LongTensor,
+            *additional_attributes: Tensor,
     ) -> Tensor:
         """Calculate global variables."""
         # Calculate homophily (scalar variables)
@@ -269,7 +207,7 @@ class DynEdge(GNN):
 
         return global_variables
 
-    def forward(self, data: Data) -> Tensor:
+    def forward(self, data: Data) -> Data:
         """Apply learnable forward pass."""
         # Convenience variables
         x, edge_index, batch = data.x, data.edge_index, data.batch
@@ -282,7 +220,7 @@ class DynEdge(GNN):
         )
 
         # Distribute global variables out to each node
-        if not self._add_global_variables_after_pooling:
+        if self._add_global_variables_to_nodes:
             distribute = (
                 batch.unsqueeze(dim=1) == torch.unique(batch).unsqueeze(dim=0)
             ).type(torch.float)
@@ -307,19 +245,6 @@ class DynEdge(GNN):
         # Post-processing
         x = self._post_processing(x)
 
-        # (Optional) Global pooling
-        if self._global_pooling_schemes:
-            x = self._global_pooling(x, batch=batch)
-            if self._add_global_variables_after_pooling:
-                x = torch.cat(
-                    [
-                        x,
-                        global_variables,
-                    ],
-                    dim=1,
-                )
+        data.encoded_x = x
 
-        # Read-out
-        x = self._readout(x)
-
-        return x
+        return data
