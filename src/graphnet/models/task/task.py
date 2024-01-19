@@ -9,7 +9,7 @@ import pandas as pd
 
 import torch
 from torch import Tensor
-from torch.nn import Linear
+from torch.nn import Linear, ModuleDict
 from torch_geometric.data import Data
 from torchmetrics import Metric
 
@@ -137,9 +137,9 @@ class Task(Model):
         else:
             val_metrics, val_metrics_log = self._split_metric_dict(val_metrics)
 
-        self.train_metrics = train_metrics
+        self.train_metrics = ModuleDict(train_metrics)
         self.train_metrics_log = train_metrics_log
-        self.val_metrics = val_metrics
+        self.val_metrics = ModuleDict(val_metrics)
         self.val_metrics_log = val_metrics_log
 
         if isinstance(target_labels, str):
@@ -162,8 +162,6 @@ class Task(Model):
         self._loss_function = loss_function
         self._inference = False
         self._loss_weight = loss_weight
-
-
 
         self._transform_prediction_training: Callable[
             [Tensor], Tensor
@@ -237,6 +235,15 @@ class Task(Model):
         )
 
         return loss
+
+    def compute_metrics(self, pred: Union[Tensor, Data], data: Data, train=False):
+        target = torch.stack(
+            [data[label] for label in self._target_labels], dim=1
+        )
+        metrics = self.train_metrics if train else self.val_metrics
+
+        for metric in metrics.values():
+            metric(pred, target)
 
     @final
     def inference(self) -> None:
