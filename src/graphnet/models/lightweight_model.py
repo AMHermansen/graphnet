@@ -1,20 +1,102 @@
 """Class containing a lightweight implementation of a standard module."""
 from logging import DEBUG
-from typing import Optional, Dict, List, Union, Any
+from typing import Optional, Dict, List, Union, Any, Tuple
 
 import torch
 from torch import Tensor
 from torch.nn import ModuleList
 from torch.optim import Adam
 from torch_geometric.data import Data
+from torchmetrics import Metric
 
-from .model import Model
-from .gnn.gnn import GNN
-from .graphs import GraphDefinition
-from .task import Task
+from graphnet.models.model import Model
+from graphnet.models.gnn.gnn import GNN
+from graphnet.models.task import Task
 
 
-class LightweightModel(Model):
+class LightweightTemplateModel(Model):
+    """Adds minimal convenience methods for trainable models."""
+    def __init__(self, tasks, **kwargs):
+        if isinstance(tasks, Task):
+            tasks = [tasks]
+        self._tasks = ModuleList(tasks)
+        super().__init__(**kwargs)
+
+    def _update_train_metrics(self, preds, target):
+        for task, pred in zip(self._tasks, preds):
+            task.compute_metrics(pred, target, train=True)
+
+    def _update_val_metrics(self, preds, target):
+        for task, pred in zip(self._tasks, preds):
+            task.compute_metrics(pred, target, train=False)
+
+    def _log_metrics(self, metrics, metrics_log, **kwargs):
+        for (key, metric), (_, metric_log) in zip(metrics.items(), metrics_log.items()):
+            if metric_log:
+                self.log(
+                    f"{key}",
+                    metric,
+                    **kwargs,
+                )
+
+    def _compute_loss(
+        self, preds: List[Tensor], data: Data, verbose: bool = False
+    ) -> Tensor:
+        """Compute and sum losses across tasks."""
+        losses = [
+            task.compute_loss(pred, data)
+            for task, pred in zip(self._tasks, preds)
+        ]
+        if verbose:
+            self.info(f"{losses}")
+        assert all(
+            loss.dim() == 0 for loss in losses
+        ), "Please reduce loss for each task separately"
+        return torch.mean(torch.stack(losses))
+
+    @property
+    def val_metrics(self) -> Tuple[Dict[str, Metric], Dict[str, bool]]:
+        metrics = {}
+        metrics_log = {}
+        for task in self._tasks:
+            target_str = "_".join(task._target_labels)
+            for key, metric in task.val_metrics.items():
+                metrics[f"{key}_{target_str}"] = metric
+            for key, metric_log in task.val_metrics_log.items():
+                metrics_log[f"{key}_{target_str}"] = metric_log
+        return metrics, metrics_log
+
+    @property
+    def train_metrics(self) -> Tuple[Dict[str, Metric], Dict[str, bool]]:
+        metrics = {}
+        metrics_log = {}
+        for task in self._tasks:
+            target_str = "_".join(task._target_labels)
+            for key, metric in task.train_metrics.items():
+                metrics[f"{key}_{target_str}"] = metric
+            for key, metric_log in task.train_metrics_log.items():
+                metrics_log[f"{key}_{target_str}"] = metric_log
+        return metrics, metrics_log
+
+    @property
+    def target_labels(self) -> List[str]:
+        """Return target label."""
+        return [label for task in self._tasks for label in task._target_labels]
+
+    @property
+    def tasks(self) -> "ModuleList[Task]":
+        """Return tasks."""
+        return self._tasks
+
+    @property
+    def prediction_labels(self) -> List[str]:
+        """Return prediction labels."""
+        return [
+            label for task in self._tasks for label in task._prediction_labels
+        ]
+
+
+class LightweightModel(LightweightTemplateModel):
     """A more lightweight version of StandardModel.
 
     More in line with the styleguide of Lightning.
@@ -35,7 +117,6 @@ class LightweightModel(Model):
         """Construct lightweight lightning model.
 
         Args:
-            graph_definition: NOT USED HERE ONLY FOR OVERLY VERBOSE BOILERPLATE DRIVEN CODE DESIGN.
             gnn: GNN backbone used.
             tasks: Which task the model is trained for.
             optimizer_class: Optimizer used to train.
@@ -46,21 +127,10 @@ class LightweightModel(Model):
             state_dict_path: Path to state_dict_path to load the model weights.
         """
         # Base class constructor
-        super().__init__(name=__name__, class_name=self.__class__.__name__, level=DEBUG)
-
-        # Check(s)
-        if isinstance(tasks, Task):
-            tasks = [tasks]
-
-        # # Useless checks, making it more difficult to use the code.
-        # # Not allowing duck typing...
-        # assert isinstance(tasks, (list, tuple))
-        # assert all(isinstance(task, Task) for task in tasks)
-        # assert isinstance(gnn, GNN)
+        super().__init__(name=__name__, class_name=self.__class__.__name__, tasks=tasks)
 
         # Member variable(s)
         self._gnn = gnn
-        self._tasks = ModuleList(tasks)
         self._optimizer_class = optimizer_class
         self._optimizer_kwargs = optimizer_kwargs or dict()
         self._scheduler_class = scheduler_class
@@ -69,25 +139,6 @@ class LightweightModel(Model):
 
         if state_dict_path:
             self.load_state_dict(state_dict_path)
-
-        # self._gnn.type(torch.float32)
-
-    @property
-    def tasks(self) -> "ModuleList[Task]":
-        """Return tasks."""
-        return self._tasks
-
-    @property
-    def target_labels(self) -> List[str]:
-        """Return target label."""
-        return [label for task in self._tasks for label in task._target_labels]
-
-    @property
-    def prediction_labels(self) -> List[str]:
-        """Return prediction labels."""
-        return [
-            label for task in self._tasks for label in task._prediction_labels
-        ]
 
     def forward(self, data: Data) -> List[Union[Tensor, Data]]:
         """Forward pass, chaining model components."""
@@ -111,6 +162,15 @@ class LightweightModel(Model):
             on_step=False,
             sync_dist=True,
         )
+        self._log_metrics(
+            *self.train_metrics,
+            batch_size=self._get_batch_size(train_batch),
+            prog_bar=True,
+            on_epoch=True,
+            on_step=False,
+            sync_dist=True,
+        )
+
         return {"loss": loss, "preds": preds}
 
     def validation_step(
@@ -128,6 +188,15 @@ class LightweightModel(Model):
             on_step=False,
             sync_dist=True,
         )
+        self._log_metrics(
+            *self.val_metrics,
+            batch_size=self._get_batch_size(val_batch),
+            prog_bar=True,
+            on_epoch=True,
+            on_step=False,
+            sync_dist=True,
+        )
+
         return {"loss": loss, "preds": preds}
 
     def test_step(self, test_batch: Data, batch_idx: int) -> Dict[str, Any]:
@@ -182,17 +251,3 @@ class LightweightModel(Model):
         out = [task(preds) for task in self._tasks]
         return out
 
-    def _compute_loss(
-        self, preds: Tensor, data: Data, verbose: bool = False
-    ) -> Tensor:
-        """Compute and sum losses across tasks."""
-        losses = [
-            task.compute_loss(pred, data)
-            for task, pred in zip(self._tasks, preds)
-        ]
-        if verbose:
-            self.info(f"{losses}")
-        assert all(
-            loss.dim() == 0 for loss in losses
-        ), "Please reduce loss for each task separately"
-        return torch.mean(torch.stack(losses))
