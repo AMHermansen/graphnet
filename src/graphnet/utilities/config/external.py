@@ -21,6 +21,7 @@ def save_outside_model(cls):
             return obj.config
         else:
             return obj
+
     class GN(cls):
         def __new__(cls_, *args, **kwargs):
             created_obj = super().__new__(cls_, *args, **kwargs)
@@ -37,12 +38,3 @@ def save_outside_model(cls):
     GN.__name__ = cls.__name__
     GN.__module__ = cls.__module__
     return GN
-
-
-if __name__ == "__main__":
-    from graphnet.models import Model
-    AccCls = save_outside_model(Accuracy)
-    a = AccCls(task="binary")
-    print(a._config)
-    b = Model.from_config(a._config, trust=True)
-    print(b)
