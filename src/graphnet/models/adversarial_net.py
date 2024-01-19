@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Union, List, Type, Any, Dict, Optional, Sequence
 
 import torch
+from lion_pytorch import Lion
+
 from graphnet.data import SQLiteDataModule
 from graphnet.models.gnn import GNN, DynEdgeTITO
 from graphnet.models.model import Model
@@ -22,10 +24,10 @@ from torchmetrics import Accuracy
 class ARNConfig:
     adv_target: Optional[str] = "is_data"
     adv_weight: float = 1.0
-    opt1: Type[torch.optim.Optimizer] = SGD
-    opt2: Type[torch.optim.Optimizer] = SGD
-    lr1: Optional[float] = 0.01
-    lr2: Optional[float] = 0.001
+    opt1: Type[torch.optim.Optimizer] = Lion
+    opt2: Type[torch.optim.Optimizer] = Lion
+    lr1: Optional[float] = 3e-5
+    lr2: Optional[float] = 3e-5
     opt1_kwargs: Optional[Dict] = field(default_factory=dict)
     opt2_kwargs: Optional[Dict] = field(default_factory=dict)
 
@@ -62,14 +64,16 @@ class AdversarialRegulatedNeuralNet(Model):
     def training_step(self, data: Data, batch_idx: int):
         data[self._args.adv_target] = data[self._args.adv_target].view(-1, 1)
         opt1, opt2 = self.optimizers()
+
         opt2.zero_grad()
-        features = self._gnn_encoder(data)
-        features.detach()
+        with torch.no_grad():
+            features = self._gnn_encoder(data)
         adversarial_pred = self._adversarial_task(features)
         adversarial_loss = self._adversarial_task.compute_loss(adversarial_pred, data)
         self.metrics.train_adv_acc(adversarial_pred, data[self._args.adv_target])
         self.manual_backward(adversarial_loss)
         opt2.step()
+        opt2.zero_grad()
 
         opt1.zero_grad()
         features = self._gnn_encoder(data)
