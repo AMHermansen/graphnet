@@ -139,7 +139,8 @@ class ModelConfig(BaseConfig):
             print(module, class_name)
             exec(f"from {module} import {class_name}")
             from graphnet.utilities.config.external import save_outside_model
-            return save_outside_model(eval(class_name))
+            gn_class = save_outside_model(eval(class_name))
+            return gn_class(**arguments)
 
         # Construct model based on arguments
         return namespace_classes[self.class_name](**arguments)
