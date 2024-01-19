@@ -3,37 +3,60 @@
 from abc import abstractmethod
 from typing import Optional, List
 
+import torch
 from torch import Tensor
 from torch_geometric.data import Data
 
 from graphnet.models import Model
+from graphnet.models.gnn.aggregation import Aggregation
 
-
-class GNN(Model):
+class RawGNN(Model):
     """Base class for all core GNN models in graphnet."""
 
     def __init__(
-        self, nb_inputs: int, readout_layer_sizes: Optional[List[int]] = None
+        self
     ) -> None:
         """Construct `GNN`."""
         # Base class constructor
         super().__init__()
 
-        # Member variables
-        self._nb_inputs = nb_inputs
-        self._readout_layer_sizes = readout_layer_sizes or [256, 128]
-        self._nb_outputs = self._readout_layer_sizes[-1]
-
     @property
+    @abstractmethod
     def nb_inputs(self) -> int:
         """Return number of input features."""
-        return self._nb_inputs
 
     @property
+    @abstractmethod
     def nb_outputs(self) -> int:
         """Return number of output features."""
-        return self._nb_outputs
 
     @abstractmethod
-    def forward(self, data: Data) -> Tensor:
+    def forward(self, data: Data) -> Data:
         """Apply learnable forward pass in model."""
+
+
+class GNN(Model):
+    @property
+    @abstractmethod
+    def nb_inputs(self) -> int:
+        """Return number of input features."""
+
+    @property
+    @abstractmethod
+    def nb_outputs(self) -> int:
+        """Return number of output features."""
+
+    @abstractmethod
+    def forward(self, data: Data) -> torch.Tensor:
+        """Apply learnable forward pass in model."""
+
+
+class StandardGNN(GNN):
+    def __init__(self, gnn: RawGNN, aggregation: Optional[Aggregation] = None):
+        super().__init__(name=__name__, class_name=self.__class__.__name__)
+        self._gnn = gnn
+        self._aggregation = aggregation
+
+    def forward(self, data: Data) -> torch.Tensor:
+        data = self._gnn(data)
+        return self._aggregation(data)
