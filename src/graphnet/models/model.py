@@ -3,7 +3,7 @@
 from abc import ABC
 import dill
 import os.path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TypeVar
 
 import torch
 from icecream import ic
@@ -22,6 +22,7 @@ class Model(
     Logger, Configurable, LightningModule, ABC, metaclass=ModelConfigSaverABC
 ):
     """Base class for all components in graphnet."""
+    T = TypeVar('T')
 
     @staticmethod
     def _get_batch_size(data: Data) -> int:
@@ -96,3 +97,7 @@ class Model(
         ), f"Argument `source` of type ({type(source)}) is not a `ModelConfig"
 
         return source._construct_model(trust, load_modules)
+
+    @staticmethod
+    def set_default_if_none(value: Optional[T], default: T) -> T:
+        return default if value is None else value
