@@ -10,7 +10,7 @@ from torch_geometric.utils.homophily import homophily
 
 
 def calculate_xyzt_homophily(
-    x: Tensor, edge_index: LongTensor, batch: Batch
+    x: Tensor, edge_index: LongTensor, batch: Tensor
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Calculate xyzt-homophily from a batch of graphs.
 
