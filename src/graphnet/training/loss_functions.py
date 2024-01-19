@@ -449,34 +449,18 @@ class VonMisesFisher2DLoss(VonMisesFisherLoss):
 
 class ZenithAdjustedVMF(VonMisesFisher2DLoss):
     def _forward(self, predictions: torch.Tensor, target: torch.Tensor):
-        return super()._forward(predictions, target) + super()._forward(predictions, 2 * torch.pi - target)
+        return -torch.log(
+            torch.exp(-super()._forward(predictions, target))
+            + torch.exp(-super()._forward(predictions, 2 * torch.pi - target))
+        )
 
 
 # Theoretically motivated, since the limit where kappa -> inf reduces to a flat distribution.
 class CosZenithAdjustedVMF(ZenithAdjustedVMF):
     def _forward(self, predictions: torch.Tensor, target: torch.Tensor):
-        target = (torch.cos(target)) * (torch.pi / 2.)
-        super()._forward(predictions, target)
+        target = (1 - torch.cos(target)) * (torch.pi / 2.)
+        return super()._forward(predictions, target)
 
-
-class EuclideanDistanceLoss(LossFunction):
-    """Mean squared error in three dimensions."""
-
-    def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
-        """Calculate 3D Euclidean distance between predicted and target.
-
-        Args:
-            prediction: Output of the model. Must have shape [N, 3]
-            target: Target tensor, extracted from graph object.
-
-        Returns:
-            Elementwise von Mises-Fisher loss terms. Shape [N,]
-        """
-        return torch.sqrt(
-            (prediction[:, 0] - target[:, 0]) ** 2
-            + (prediction[:, 1] - target[:, 1]) ** 2
-            + (prediction[:, 2] - target[:, 2]) ** 2
-        )
 
 
 class VonMisesFisher3DLoss(VonMisesFisherLoss):
