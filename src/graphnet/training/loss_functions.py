@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 import scipy.special
 import torch
-from icecream import ic
 from torch import Tensor
 from torch import nn
 from torch.nn.functional import (
@@ -443,7 +442,6 @@ class VonMisesFisher2DLoss(VonMisesFisherLoss):
             ],
             dim=1,
         )
-
         return self._evaluate(p, t)
 
 
@@ -461,6 +459,11 @@ class CosZenithAdjustedVMF(ZenithAdjustedVMF):
         target = (1 - torch.cos(target)) * (torch.pi / 2.)
         return super()._forward(predictions, target)
 
+
+class CosTransformedVMF(VonMisesFisher2DLoss):
+    def _forward(self, predictions: torch.Tensor, target: torch.Tensor):
+        target = (1 - torch.cos(target)) * (torch.pi / 2.)
+        return super()._forward(predictions, target)
 
 
 class VonMisesFisher3DLoss(VonMisesFisherLoss):

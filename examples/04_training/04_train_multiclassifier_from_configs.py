@@ -13,7 +13,7 @@ from graphnet.constants import (
     MODEL_CONFIG_DIR,
 )
 from graphnet.data.dataloader import DataLoader
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 from graphnet.models import StandardModel
 from graphnet.training.callbacks import GNProgressBar
 from graphnet.utilities.argparse import ArgumentParser
@@ -77,7 +77,7 @@ def main(
 
     # Construct dataloaders
     dataset_config = DatasetConfig.load(dataset_config_path)
-    datasets: Dict[str, Any] = Dataset.from_config(
+    datasets: Dict[str, Any] = GNDatasetBase.from_config(
         dataset_config,
     )
 

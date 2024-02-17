@@ -18,7 +18,7 @@ GLOBAL_POOLINGS = {
 }
 
 
-class Aggregation(Model):
+class Aggregator(Model):
 
     @property
     @abstractmethod
@@ -35,18 +35,16 @@ class Aggregation(Model):
         pass
 
 
-class StandardPooling(Aggregation):
+class StandardPooling(Aggregator):
     def __init__(
             self,
             nb_inputs: int,
             nb_original_graph_features: int,
-            global_pooling_schemes: Optional[List[str]] = None,
+            global_pooling_schemes: List[str],
             use_global_features: bool = True,
             readout_mlp_layers: Optional[List[int]] = None,
     ):
         super().__init__(name=__name__, class_name=self.__class__.__name__)
-
-        global_pooling_schemes = ["max"] if global_pooling_schemes is None else global_pooling_schemes
 
         # Global pooling scheme(s)
         if isinstance(global_pooling_schemes, str):

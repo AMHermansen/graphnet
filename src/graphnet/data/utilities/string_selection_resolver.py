@@ -12,7 +12,7 @@ import pandas as pd
 from graphnet.utilities.logging import Logger
 
 if TYPE_CHECKING:
-    from graphnet.data.dataset import Dataset
+    from graphnet.data.dataset import GNDatasetBase
 
 
 class StringSelectionResolver(Logger):
@@ -49,7 +49,7 @@ class StringSelectionResolver(Logger):
 
     def __init__(
         self,
-        dataset: "Dataset",
+        dataset: "GNDatasetBase",
         index_column: str,
         seed: Optional[int] = None,
         use_cache: bool = True,

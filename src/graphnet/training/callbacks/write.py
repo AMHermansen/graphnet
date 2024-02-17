@@ -2,11 +2,13 @@
 import os
 import warnings
 from abc import abstractmethod, ABC
+from functools import singledispatch
 from itertools import chain
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Union, TYPE_CHECKING
+from typing import Optional, List, Dict, Any, Union, TYPE_CHECKING, Literal, Sequence
 
 import numpy as np
+from numpy import ndarray
 import pandas as pd
 import torch
 from icecream import ic
@@ -25,7 +27,7 @@ class BaseCacheWriter(Callback, ABC):
 
     def __init__(
         self,
-        stage: Optional[str] = "validation",
+        stage: Literal["validation", "predict", "auto"] = "auto",
         output_dir: Optional[Union[str, Path]] = None,
         results_folder: str = "results",
         output_file_prefix: str = "validation_result_",
@@ -55,12 +57,14 @@ class BaseCacheWriter(Callback, ABC):
         self._val_epoch_frequency = val_epoch_frequency
         self._cache: Dict[str, List] = {}
 
-        if self.stage not in ["validation", "predict"]:
+        if self.stage not in ["validation", "predict", "auto"]:
             raise ValueError(
-                f"stage must be either 'validation' or 'predict', got {self.stage}"
+                f"stage must be either 'validation', 'predict', and 'auto', got {self.stage}"
             )
 
     def setup(self, trainer: Trainer, model: "LightweightModel", stage: str) -> None:
+        if self.stage == "auto" and stage in ["validate", "predict"]:
+            self.stage = "predict" if stage == "predict" else "validation"
         if self._output_dir is None:
             self._output_dir = trainer.default_root_dir
         if self._results_folder:
@@ -176,7 +180,7 @@ class WriteToParquet(BaseCacheWriter):
 
     def __init__(
             self,
-            stage: Optional[str] = "validation",
+            stage: Literal["validation", "predict", "auto"] = "auto",
             output_dir: Optional[Union[str, Path]] = None,
             results_folder: str = "results",
             output_file_prefix: str = "validation_result_",
@@ -402,3 +406,116 @@ class WriteBatchToNumpy(BasePredictionWriter):
         padding_mask = padding_mask.detach().cpu().numpy()
         np.save(f"{path}/x_true.npy", x_true)
         np.save(f"{path}/padding_mask.npy", padding_mask)
+
+
+@singledispatch
+def _guarded_detach(t):
+    raise TypeError(f"Unexpected type of t={type(t)}. "
+                    f"Only NoneType and torch.Tensor are supported")
+
+
+@_guarded_detach.register
+def _(t: torch.Tensor):
+    return t.detach().cpu().numpy()
+
+
+@_guarded_detach.register
+def _(t: None):
+    return None
+
+
+@singledispatch
+def _guarded_save(arr, f: str):
+    raise TypeError(f"Unexpected type of arr={type(arr)}. "
+                    f"Only NoneType and numpy.ndarray are supported")
+
+
+@_guarded_save.register
+def _(arr: ndarray, f: str):
+    np.save(f, arr)
+
+
+@_guarded_save.register
+def _(arr: None, f: str):
+    pass
+
+
+def _guarded_get(d, key):
+    return _guarded_detach(d.get(key))
+
+
+class LatentWriter(BasePredictionWriter):
+    def __init__(
+            self,
+            output_dir: Optional[str] = None,
+
+    ):
+        super().__init__(write_interval="batch")
+        self._output_dir = output_dir
+        self._node_feature_dir = None
+        self._aggregated_feature_dir = None
+
+    def setup(self, trainer: Trainer, model: "LightweightModel", stage: str) -> None:
+        if self._output_dir is None:
+            self._output_dir = os.path.join(trainer.default_root_dir, "results")
+        self._node_feature_dir = os.path.join(self._output_dir, "node_features")
+        self._aggregated_feature_dir = os.path.join(self._output_dir, "aggregated_features")
+
+        os.makedirs(self._node_feature_dir)
+        os.makedirs(self._aggregated_feature_dir)
+
+        super().setup(trainer, model, stage)
+
+    def write_on_batch_end(
+        self,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        prediction: Dict[str, torch.Tensor],
+        batch_indices: Optional[Sequence[int]],
+        batch: Data,
+        batch_idx: int,
+        dataloader_idx: int,
+    ) -> None:
+        adv_latent_pred = _guarded_get(prediction, "adv_latent_pred")
+        adv_node_pred = _guarded_get(prediction, "adv_node_pred")
+        latent_features = _guarded_get(prediction, "latent_features")
+        node_features = _guarded_get(prediction, "node_features")
+        batch_nums = batch.batch.detach().cpu().numpy()
+
+        _guarded_save(adv_node_pred, os.path.join(self._node_feature_dir, f"adv_node_pred{batch_idx}.npy"))
+        _guarded_save(node_features, os.path.join(self._node_feature_dir, f"node_features{batch_idx}.npy"))
+        _guarded_save(batch_nums, os.path.join(self._node_feature_dir, f"batch_info{batch_idx}.npy"))
+
+        B = batch_nums[-1]
+        if adv_latent_pred is not None:
+            for idx, batch_latent_pred in enumerate(
+                adv_latent_pred
+            ):
+                batch_number = B * batch_idx + idx
+                _guarded_save(
+                    batch_latent_pred,
+                    os.path.join(
+                        self._aggregated_feature_dir,
+                        f"adv_latent_pred{batch_number}.npy"
+                    )
+                )
+        if latent_features is not None:
+            for idx, batch_latent_features in enumerate(
+                latent_features
+            ):
+                batch_number = B * batch_idx + idx
+                _guarded_save(
+                    batch_latent_features,
+                    os.path.join(
+                        self._aggregated_feature_dir,
+                        f"adv_latent_feature{batch_number}.npy")
+                )
+
+
+class AdversarialLatentWriter(LatentWriter):
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "Deprecated callback use LatentWriter instead",
+            DeprecationWarning,
+        )
+        super().__init__(*args, **kwargs)

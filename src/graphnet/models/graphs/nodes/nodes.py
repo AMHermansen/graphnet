@@ -158,30 +158,6 @@ class NodesAsPulses(NodeDefinition):
         return data
 
 
-class MaxNodesAsPulses(NodesAsPulses):
-    """Represent each measured pulse of Cherenkov Radiation as a node."""
-
-    def __init__(
-        self,
-        max_length: int = 256,
-        input_feature_names: Optional[List[str]] = None,
-    ) -> None:
-        """Construct `MaxNodesAsPulses`.
-
-        Args:
-            max_length: Maximum number of pulses to keep.
-            input_feature_names: (Optional) column names for input features.
-        """
-        self.max_length = max_length
-        # Base class constructor
-        super().__init__(input_feature_names=input_feature_names)
-
-    def _construct_nodes(
-        self, x: torch.Tensor, include_sensor_id: bool = False
-    ) -> Tuple[Data, List[str]]:
-        return super()._construct_nodes(x=x[: self.max_length], include_sensor_id=include_sensor_id)
-
-
 class MAENodes(NodesAsPulses):
     """Choses nodes to mask for MAE training."""
 

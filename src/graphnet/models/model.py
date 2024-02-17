@@ -19,7 +19,11 @@ from graphnet.utilities.config import (
 
 
 class Model(
-    Logger, Configurable, LightningModule, ABC, metaclass=ModelConfigSaverABC
+    Logger,
+    Configurable,
+    LightningModule,
+    ABC,
+    metaclass=ModelConfigSaverABC
 ):
     """Base class for all components in graphnet."""
     T = TypeVar('T')

@@ -5,8 +5,8 @@ import torch
 from torch import nn
 from typing import Callable, Any, Optional, Tuple, List
 
-from .nodes import NodeDefinition
-from .utils import fps
+from graphnet.models.graphs.nodes.utils import fps
+from graphnet.models.graphs.nodes.nodes import NodesAsPulses, NodeDefinition
 
 
 class PulsesCroppedValue(NodeDefinition):
@@ -130,3 +130,27 @@ class CroppedFPSNodes(NodeDefinition):
             arr[:, fps_features], self.max_length, self.start_idx
         )
         return Data(x=x[sample_indices])
+
+
+class MaxNodesAsPulses(NodesAsPulses):
+    """Represent each measured pulse of Cherenkov Radiation as a node."""
+
+    def __init__(
+        self,
+        max_length: int = 256,
+        input_feature_names: Optional[List[str]] = None,
+    ) -> None:
+        """Construct `MaxNodesAsPulses`.
+
+        Args:
+            max_length: Maximum number of pulses to keep.
+            input_feature_names: (Optional) column names for input features.
+        """
+        self.max_length = max_length
+        # Base class constructor
+        super().__init__(input_feature_names=input_feature_names)
+
+    def _construct_nodes(
+        self, x: torch.Tensor, include_sensor_id: bool = False
+    ) -> Tuple[Data, List[str]]:
+        return super()._construct_nodes(x=x[: self.max_length], include_sensor_id=include_sensor_id)

@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from torch_geometric.data import Batch, Data
 
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 from graphnet.data.dataset import SQLiteDataset
 from graphnet.data.dataset import ParquetDataset
 from graphnet.models import Model
@@ -162,7 +162,7 @@ def make_train_validation_dataloader(
 
     if selection is None:
         # If no selection is provided, use all events in dataset.
-        dataset: Dataset
+        dataset: GNDatasetBase
         if db.endswith(".db"):
             dataset = SQLiteDataset(
                 path=db,

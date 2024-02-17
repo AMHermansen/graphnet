@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, List, Union
 import torch.utils.data
 from torch_geometric.data import Batch, Data
 
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 from graphnet.utilities.config import DatasetConfig
 
 
@@ -28,7 +28,7 @@ class DataLoader(torch.utils.data.DataLoader):
 
     def __init__(
         self,
-        dataset: Dataset,
+        dataset: GNDatasetBase,
         batch_size: int = 1,
         shuffle: bool = False,
         num_workers: int = 10,
@@ -63,7 +63,7 @@ class DataLoader(torch.utils.data.DataLoader):
                 "`shuffle` is automatically inferred from the selection name, "
                 "and thus should not specified as an argument."
             )
-            datasets = Dataset.from_config(config)
+            datasets = GNDatasetBase.from_config(config)
             assert isinstance(datasets, dict)
             data_loaders: Dict[str, DataLoader] = {}
             for name, dataset in datasets.items():
@@ -80,6 +80,6 @@ class DataLoader(torch.utils.data.DataLoader):
                 "When passing a `DatasetConfig` with a single selections, you "
                 "need to specify `shuffle` as an argument."
             )
-            dataset = Dataset.from_config(config)
-            assert isinstance(dataset, Dataset)
+            dataset = GNDatasetBase.from_config(config)
+            assert isinstance(dataset, GNDatasetBase)
             return cls(dataset, **kwargs)

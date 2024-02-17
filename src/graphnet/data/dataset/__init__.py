@@ -4,7 +4,7 @@ from graphnet.utilities.imports import has_torch_package
 
 if has_torch_package():
     import torch.multiprocessing
-    from .dataset import EnsembleDataset, Dataset, ColumnMissingException
+    from .dataset import EnsembleDataset, GNDatasetBase, ColumnMissingException
     from .parquet.parquet_dataset import ParquetDataset
     from .sqlite.sqlite_dataset import SQLiteDataset
 

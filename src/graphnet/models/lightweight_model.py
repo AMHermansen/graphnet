@@ -9,18 +9,19 @@ from torch.optim import Adam
 from torch_geometric.data import Data
 from torchmetrics import Metric
 
+from graphnet.models.gnn.aggregator import Aggregator
 from graphnet.models.model import Model
-from graphnet.models.gnn.gnn import GNN
+from graphnet.models.gnn.gnn import GNN, StandardGNN, RawGNN
 from graphnet.models.task import Task
 
 
 class LightweightTemplateModel(Model):
     """Adds minimal convenience methods for trainable models."""
-    def __init__(self, tasks, **kwargs):
+    def __init__(self, tasks: Union[Task, List[Task]], **kwargs):
+        super().__init__(**kwargs)
         if isinstance(tasks, Task):
             tasks = [tasks]
         self._tasks = ModuleList(tasks)
-        super().__init__(**kwargs)
 
     def _update_train_metrics(self, preds, target):
         for task, pred in zip(self._tasks, preds):
@@ -105,7 +106,8 @@ class LightweightModel(LightweightTemplateModel):
     def __init__(
         self,
         *,
-        gnn: GNN,
+        gnn: RawGNN,
+        aggregator: Aggregator,
         tasks: Union[Task, List[Task]],
         optimizer_class: type = Adam,
         optimizer_kwargs: Optional[Dict] = None,
@@ -130,7 +132,7 @@ class LightweightModel(LightweightTemplateModel):
         super().__init__(name=__name__, class_name=self.__class__.__name__, tasks=tasks)
 
         # Member variable(s)
-        self._gnn = gnn
+        self._gnn = StandardGNN(gnn, aggregator)
         self._optimizer_class = optimizer_class
         self._optimizer_kwargs = optimizer_kwargs or dict()
         self._scheduler_class = scheduler_class
@@ -214,8 +216,14 @@ class LightweightModel(LightweightTemplateModel):
         return {"loss": loss, "preds": preds}
 
     def predict_step(self, predict_batch: Data, batch_idx: int) -> Dict[str, Any]:
-        preds = self._shared_step(predict_batch, batch_idx)
-        return {"preds": preds}
+        encoded_graph = self._gnn._gnn(predict_batch)
+        encoded_latent_space = self._gnn._aggregation(encoded_graph)
+        preds = [task(encoded_latent_space) for task in self._tasks]
+        return {
+            "preds": preds,
+            "latent_features": encoded_latent_space,
+            "node_features": encoded_graph.encoded_x,
+        }
 
     def configure_optimizers(self) -> Dict[str, Any]:
         """Configure the model's optimizer(s)."""

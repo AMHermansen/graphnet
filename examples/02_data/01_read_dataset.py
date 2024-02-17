@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from graphnet.constants import TEST_PARQUET_DATA, TEST_SQLITE_DATA
 from graphnet.data.constants import FEATURES, TRUTH
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 from graphnet.data.dataset import SQLiteDataset
 from graphnet.data.dataset import ParquetDataset
 from graphnet.utilities.argparse import ArgumentParser
@@ -75,7 +75,7 @@ def main(backend: str) -> None:
         truth_table=truth_table,
         graph_definition=graph_definition,
     )
-    assert isinstance(dataset, Dataset)
+    assert isinstance(dataset, GNDatasetBase)
 
     logger.info(str(dataset[1]))
     logger.info(dataset[1].x)

@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 from graphnet.constants import CONFIG_DIR
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 from graphnet.utilities.logging import Logger
 from graphnet.utilities.argparse import ArgumentParser
 
@@ -18,11 +18,11 @@ def main() -> None:
     logger = Logger()
 
     # Construct dataloader
-    dataset = Dataset.from_config(
+    dataset = GNDatasetBase.from_config(
         os.path.join(CONFIG_DIR, "datasets/test_data_sqlite.yml")
     )
 
-    assert isinstance(dataset, Dataset)
+    assert isinstance(dataset, GNDatasetBase)
     features = dataset._features[1:]
 
     # Get feature matrix

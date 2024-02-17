@@ -12,7 +12,7 @@ from torch.utils.data import ConcatDataset
 import graphnet
 import graphnet.constants
 from graphnet.data.constants import FEATURES, TRUTH
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 from graphnet.data.dataset import ParquetDataset
 from graphnet.data.dataset import SQLiteDataset
 from graphnet.utilities.config import DatasetConfig
@@ -82,8 +82,8 @@ def test_dataset_config_save_load_reconstruct(backend: str) -> None:
     assert isinstance(loaded_config, DatasetConfig)
 
     # Reconstruct dataset
-    constructed_dataset = Dataset.from_config(loaded_config)
-    assert isinstance(constructed_dataset, Dataset)
+    constructed_dataset = GNDatasetBase.from_config(loaded_config)
+    assert isinstance(constructed_dataset, GNDatasetBase)
     assert constructed_dataset.config == dataset.config
     assert len(constructed_dataset) == len(dataset)
     nb_test_events = min(5, len(constructed_dataset))
@@ -105,7 +105,7 @@ def test_dataset_config_dict_selection(backend: str) -> None:
         "test": "event_no % 5 == 0",
     }
 
-    datasets: Dict[str, Dataset] = Dataset.from_config(config)
+    datasets: Dict[str, GNDatasetBase] = GNDatasetBase.from_config(config)
     assert isinstance(datasets, dict)
     assert len(datasets) == 2
     assert "train" in datasets and "test" in datasets
@@ -133,7 +133,7 @@ def test_dataset_config_list_selection(backend: str) -> None:
     config = DatasetConfig.load(config_path)
     config.selection = ["event_no % 5 == 0", "event_no % 5 >= 3"]
 
-    dataset: ConcatDataset = Dataset.from_config(config)
+    dataset: ConcatDataset = GNDatasetBase.from_config(config)
     assert isinstance(dataset, ConcatDataset)
     assert len(dataset) == 3
     for event in dataset:
@@ -154,7 +154,7 @@ def test_dataset_config_dict_of_list_selection(backend: str) -> None:
         "test": ["event_no % 5 == 1", "event_no % 5 == 2"],
     }
 
-    datasets: Dict[str, ConcatDataset] = Dataset.from_config(config)
+    datasets: Dict[str, ConcatDataset] = GNDatasetBase.from_config(config)
     assert isinstance(datasets, dict)
     for dataset in datasets.values():
         assert isinstance(dataset, ConcatDataset)
@@ -181,7 +181,7 @@ def test_dataset_config_functions(backend: str) -> None:
         "inverse": "abs(pid) == 14 and 10**(energy) <= 100",
     }
 
-    datasets: Dict[str, Dataset] = Dataset.from_config(config)
+    datasets: Dict[str, GNDatasetBase] = GNDatasetBase.from_config(config)
 
     # Check that event counts match expectation
     assert len(datasets["nu_mu"]) == 1
@@ -246,7 +246,7 @@ def test_dataset_config_files(backend: str) -> None:
         "JSON": selection_file_json,
     }
 
-    datasets: Dict[str, Dataset] = Dataset.from_config(config)
+    datasets: Dict[str, GNDatasetBase] = GNDatasetBase.from_config(config)
 
     # Check that event counts match expectation
     assert len(datasets["CSV"]) == 2

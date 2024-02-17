@@ -7,5 +7,7 @@ from .write import (
     WriteToParquet,
     MAEWriteCB,
     WriteBatchToNumpy,
+    AdversarialLatentWriter,
+    LatentWriter,
 )
 from .early_stopping import GraphnetEarlyStopping

@@ -4,10 +4,10 @@ from typing import Any, List, Optional, Tuple, Union
 import pandas as pd
 import sqlite3
 
-from graphnet.data.dataset.dataset import Dataset, ColumnMissingException
+from graphnet.data.dataset.dataset import GNDatasetBase, ColumnMissingException
 
 
-class SQLiteDataset(Dataset):
+class SQLiteDataset(GNDatasetBase):
     """Pytorch dataset for reading data from SQLite databases."""
 
     # Implementing abstract method(s)

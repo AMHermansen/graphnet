@@ -254,9 +254,9 @@ This YAML file will contain details about the path to the input data, the tables
 In another session, you can then recreate the same `Dataset`:
 
 ```python
-from graphnet.data.dataset import Dataset
+from graphnet.data.dataset import GNDatasetBase
 
-dataset = Dataset.from_config("dataset.yml")
+dataset = GNDatasetBase.from_config("dataset.yml")
 ```
 
 You also have the option to define multiple datasets from the same data file(s) using a single `DatasetConfig` file but with multiple selections:

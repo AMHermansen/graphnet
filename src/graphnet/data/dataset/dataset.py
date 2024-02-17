@@ -86,7 +86,7 @@ def parse_graph_definition(cfg: dict) -> GraphDefinition:
     return graph_definition
 
 
-class Dataset(
+class GNDatasetBase(
     Logger,
     Configurable,
     torch.utils.data.Dataset,
@@ -101,9 +101,9 @@ class Dataset(
         cls,
         source: Union[DatasetConfig, str],
     ) -> Union[
-        "Dataset",
+        "GNDatasetBase",
         "EnsembleDataset",
-        Dict[str, "Dataset"],
+        Dict[str, "GNDatasetBase"],
         Dict[str, "EnsembleDataset"],
     ]:
         """Construct `Dataset` instance from `source` configuration."""
@@ -137,7 +137,7 @@ class Dataset(
     @classmethod
     def concatenate(
         cls,
-        datasets: List["Dataset"],
+        datasets: List["GNDatasetBase"],
     ) -> "EnsembleDataset":
         """Concatenate multiple `Dataset`s into one instance."""
         return EnsembleDataset(datasets)
@@ -145,15 +145,15 @@ class Dataset(
     @classmethod
     def _construct_datasets_from_dict(
         cls, config: DatasetConfig
-    ) -> Dict[str, "Dataset"]:
+    ) -> Dict[str, "GNDatasetBase"]:
         """Construct `Dataset` for each entry in dict `self.selection`."""
         assert isinstance(config.selection, dict)
-        datasets: Dict[str, "Dataset"] = {}
+        datasets: Dict[str, "GNDatasetBase"] = {}
         selections: Dict[str, Union[str, List]] = deepcopy(config.selection)
         for key, selection in selections.items():
             config.selection = selection
-            dataset = Dataset.from_config(config)
-            assert isinstance(dataset, (Dataset, EnsembleDataset))
+            dataset = GNDatasetBase.from_config(config)
+            assert isinstance(dataset, (GNDatasetBase, EnsembleDataset))
             datasets[key] = dataset
 
         # Reset `selections`.
@@ -164,15 +164,15 @@ class Dataset(
     @classmethod
     def _construct_dataset_from_list_of_strings(
         cls, config: DatasetConfig
-    ) -> "Dataset":
+    ) -> "GNDatasetBase":
         """Construct `Dataset` for each entry in list `self.selection`."""
         assert isinstance(config.selection, list)
-        datasets: List["Dataset"] = []
+        datasets: List["GNDatasetBase"] = []
         selections: List[str] = deepcopy(cast(List[str], config.selection))
         for selection in selections:
             config.selection = selection
-            dataset = Dataset.from_config(config)
-            assert isinstance(dataset, Dataset)
+            dataset = GNDatasetBase.from_config(config)
+            assert isinstance(dataset, GNDatasetBase)
             datasets.append(dataset)
 
         # Reset `selections`.
@@ -668,6 +668,9 @@ class Dataset(
                 "track": int(
                     (abs_pid == 14) & (truth_dict["interaction_type"] == 1)
                 ),
+                "cascade": 1 ^ int(
+                    (abs_pid == 14) & (truth_dict["interaction_type"] == 1)
+                ),
                 "dbang": self._get_dbang_label(truth_dict),
                 "corsika": int(abs_pid > 20),
                 "is_data": int(sim_type == "data"),
@@ -683,6 +686,7 @@ class Dataset(
                 "v_u": -1,
                 "v_t": -1,
                 "track": -1,
+                "cascade": -1,
                 "dbang": -1,
                 "corsika": -1,
             }
@@ -700,7 +704,7 @@ class Dataset(
 class EnsembleDataset(torch.utils.data.ConcatDataset):
     """Construct a single dataset from a collection of datasets."""
 
-    def __init__(self, datasets: Iterable[Dataset]) -> None:
+    def __init__(self, datasets: Iterable[GNDatasetBase]) -> None:
         """Construct a single dataset from a collection of datasets.
 
         Args:

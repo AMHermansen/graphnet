@@ -6,7 +6,7 @@ import numpy as np
 from torch.utils.data import Sampler
 
 if TYPE_CHECKING:
-    from graphnet.data.dataset import Dataset
+    from graphnet.data.dataset import GNDatasetBase
 from tqdm import tqdm
 
 
@@ -57,7 +57,7 @@ class SequenceBucketSampler(Sampler):
 # Way too slow to get lengths of all events
 class SequenceBucketingDatasetSampler(SequenceBucketSampler):
     def __init__(
-        self, dataset: "Dataset", batch_size: int, shuffle: bool = False
+        self, dataset: "GNDatasetBase", batch_size: int, shuffle: bool = False
     ):
         event_counts = [
             get_n_pulses(

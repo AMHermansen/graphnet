@@ -5,10 +5,10 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import numpy as np
 import awkward as ak
 
-from graphnet.data.dataset.dataset import Dataset, ColumnMissingException
+from graphnet.data.dataset.dataset import GNDatasetBase, ColumnMissingException
 
 
-class ParquetDataset(Dataset):
+class ParquetDataset(GNDatasetBase):
     """Pytorch dataset for reading from Parquet files."""
 
     # Implementing abstract method(s)

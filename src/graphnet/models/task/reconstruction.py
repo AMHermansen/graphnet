@@ -98,6 +98,14 @@ class ZenithReconstructionWithKappa(ZenithReconstruction):
         return torch.stack((angle, kappa), dim=1)
 
 
+class RawZenithReconstructionWithKappa(Task):
+    default_target_labels = ["zenith"]
+    default_prediction_labels = ["zenith_pred", "zenith_kappa"]
+    nb_inputs = 2
+
+    _forward = torch.nn.Identity()
+
+
 class EnergyReconstruction(Task):
     """Reconstructs energy using stable method."""
 

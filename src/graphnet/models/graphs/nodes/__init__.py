@@ -9,8 +9,7 @@ from .nodes import (
     NodeDefinition,
     NodesAsPulses,
     PercentileClusters,
-    MaxNodesAsPulses,
 )
-from .cropped_nodes import PulsesCroppedRandomly, PulsesCroppedValue
+from .cropped_nodes import PulsesCroppedRandomly, PulsesCroppedValue, MaxNodesAsPulses
 from .summary_nodes import MircoSummaryNodes
 from .clustering_nodes import FPS_KNN_ClusterNodes
