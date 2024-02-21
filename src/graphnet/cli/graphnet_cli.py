@@ -42,7 +42,7 @@ class GraphnetCLI(LightningCLI):
         )
         # Link components to correct modules.
         parser.link_arguments(
-            "graph_definition", "data.graph_definition", apply_on="instantiate"
+            "graph_definition", "data.init_args.graph_definition", apply_on="instantiate"
         )
         parser.link_arguments("gnn", "model.gnn", apply_on="instantiate")
         parser.link_arguments("aggregator", "model.aggregator", apply_on="instantiate")
