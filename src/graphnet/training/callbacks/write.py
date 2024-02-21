@@ -11,7 +11,6 @@ import numpy as np
 from numpy import ndarray
 import pandas as pd
 import torch
-from icecream import ic
 from lightning import Callback, Trainer, LightningModule
 from lightning.pytorch.callbacks import BasePredictionWriter
 from torch_geometric.data import Batch, Data
@@ -63,7 +62,7 @@ class BaseCacheWriter(Callback, ABC):
             )
 
     def setup(self, trainer: Trainer, model: "LightweightModel", stage: str) -> None:
-        if self.stage == "auto" and stage in ["validate", "predict"]:
+        if self.stage == "auto" and stage in ["validate", "predict", "fit"]:
             self.stage = "predict" if stage == "predict" else "validation"
         if self._output_dir is None:
             self._output_dir = trainer.default_root_dir
