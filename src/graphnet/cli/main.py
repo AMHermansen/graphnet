@@ -17,7 +17,6 @@ def main_cli() -> None:
     """CLI entrypoint of GraphNeT."""
     cli = GraphnetCLI(  # noqa
         LightweightModel,
-        SQLiteDataModule,
         seed_everything_default=2023,
         parser_kwargs={"parser_mode": "omegaconf"},
     )

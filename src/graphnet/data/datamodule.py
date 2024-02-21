@@ -1,7 +1,10 @@
 """Datamodule class."""
 from collections.abc import Sequence
+from copy import deepcopy
+from dataclasses import dataclass, asdict
 from itertools import chain
-from typing import Union, List, Dict, Optional, Callable, Any
+from pathlib import Path
+from typing import Union, List, Dict, Optional, Callable, Any, TypeVar, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -10,12 +13,47 @@ from lightning.pytorch.utilities.types import (
     TRAIN_DATALOADERS,
     EVAL_DATALOADERS,
 )
+from torch.utils.data import DataLoader
 
 from graphnet.models.graphs import GraphDefinition
 from graphnet.training.utils import (
-    make_dataloader,
+    make_dataloader, collate_fn,
 )
 from graphnet.utilities.logging import Logger
+
+
+if TYPE_CHECKING:
+    from graphnet.data.dataset.sharded import ParquetSharded
+
+
+def _convert_to_dict(input_value: Any, value_type: type) -> Dict[str, Any]:
+    if isinstance(input_value, value_type):
+        input_value = [input_value for _ in range(3)]
+    if isinstance(input_value, Sequence):
+        input_value = {
+            k: v for k, v in zip(["train", "val", "test"], input_value)
+        }
+    if input_value is None:
+        input_value = {k: None for k in ["train", "val", "test"]}
+    if isinstance(input_value, dict):
+        return input_value
+    else:
+        raise ValueError(
+            f"Argument {input} has an unexpected type of {type(input)}"
+        )
+
+
+def _get_unique_keys(*dicts: Dict[Any, Any]) -> List[Any]:
+    return list(set(chain.from_iterable(sub.keys() for sub in dicts)))
+
+
+def _process_selection(sel: str) -> Union[List[int], str]:
+    if (file_type := sel.split(".")[-1]) == "csv":
+        return pd.read_csv(sel).reset_index(drop=True)['event_no'].ravel().tolist()
+    elif file_type == "parquet":
+        return pd.read_parquet(sel)["event_no"].tolist()
+    else:
+        return sel
 
 
 class SQLiteDataModule(Logger, LightningDataModule):
@@ -76,23 +114,23 @@ class SQLiteDataModule(Logger, LightningDataModule):
 
         if isinstance(selection, Sequence) and isinstance(selection[0], str):
             selection = {
-                k: self._process_selection(v)
+                k: _process_selection(v)
                 for k, v in zip(["train", "val", "test"], selection)
             }
         if isinstance(selection, Dict) and isinstance(selection["train"], str):
             selection = {
-                k: self._process_selection(v)
+                k: _process_selection(v)
                 for k, v in selection.items()
             }
 
-        self._db = self._convert_to_dict(db, str)
+        self._db = _convert_to_dict(db, str)
         self._pulsemaps = pulsemaps
         self._graph_definition = graph_definition
         self._features = features
         self._truth = truth
-        self._batch_size = self._convert_to_dict(batch_size, int)
+        self._batch_size = _convert_to_dict(batch_size, int)
         self._train_shuffle = train_shuffle
-        self._num_workers = self._convert_to_dict(num_workers, int)
+        self._num_workers = _convert_to_dict(num_workers, int)
         self._persistent_workers = persistent_workers
         self._node_truth = node_truth
         self._truth_table = truth_table
@@ -119,10 +157,9 @@ class SQLiteDataModule(Logger, LightningDataModule):
             labels=self._labels,
         )
 
-        # self.save_hyperparameters(ignore=["graph_definition"])
         self._selection = selection
 
-        self._all_keys = self._get_unique_keys(
+        self._all_keys = _get_unique_keys(
             self._batch_size, self._selection, self._num_workers, self._db  # type: ignore
         )
 
@@ -130,36 +167,6 @@ class SQLiteDataModule(Logger, LightningDataModule):
         assert all(key in ["test", "val", "train"] for key in self._all_keys)
         assert "train" in self._all_keys
         assert "val" in self._all_keys
-
-    @staticmethod
-    def _convert_to_dict(input_value: Any, value_type: type) -> Dict[str, Any]:
-        if isinstance(input_value, value_type):
-            input_value = [input_value for _ in range(3)]
-        if isinstance(input_value, Sequence):
-            input_value = {
-                k: v for k, v in zip(["train", "val", "test"], input_value)
-            }
-        if input_value is None:
-            input_value = {k: None for k in ["train", "val", "test"]}
-        if isinstance(input_value, dict):
-            return input_value
-        else:
-            raise ValueError(
-                f"Argument {input} has an unexpected type of {type(input)}"
-            )
-
-    @staticmethod
-    def _get_unique_keys(*dicts: Dict[Any, Any]) -> List[Any]:
-        return list(set(chain.from_iterable(sub.keys() for sub in dicts)))
-
-    @staticmethod
-    def _process_selection(sel: str) -> Union[List[int], str]:
-        if sel[-4:] == ".csv":
-            return pd.read_csv(sel).reset_index(drop=True)['event_no'].ravel().tolist()
-        elif sel[-8:] == ".parquet":
-            return pd.read_parquet(sel)["event_no"].tolist()
-        else:
-            return sel
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         """Create train dataloader."""
@@ -198,3 +205,108 @@ class SQLiteDataModule(Logger, LightningDataModule):
         )
 
     predict_dataloader = test_dataloader
+
+
+@dataclass
+class ShardedDatasetConfig:
+    meta_path: Union[str, Path]
+    pulsemap: str
+    features: List[str]
+    truth: Optional[Union[List[str], str]] = None
+    node_truth: Optional[List[str]] = None
+    index_column: str = "event_no"
+    pulsemap_path: Optional[Union[str, Path]] = None
+    selection: Optional[List[int]] = None
+    node_feature_hook: Optional[
+        Callable[[np.ndarray, int, "ParquetSharded"], np.ndarray]] = None,
+
+
+class ShardedDataModule(Logger, LightningDataModule):
+    T = TypeVar("T")
+
+    def __init__(
+            self,
+            graph_definition: GraphDefinition,
+            dataset_config: ShardedDatasetConfig,
+            selections: Dict[str, Union[str, List[int]]],
+            train_loader_config: Optional[Dict[str, Any]] = None,
+            val_loader_config: Optional[Dict[str, Any]] = None,
+            test_loader_config: Optional[Dict[str, Any]] = None,
+            predict_loader_config: Optional[Dict[str, Any]] = None,
+            common_loader_config: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__()
+        train_loader_config = self._default_if_none(train_loader_config, {})
+        val_loader_config = self._default_if_none(val_loader_config, {})
+        test_loader_config = self._default_if_none(test_loader_config, {})
+        predict_loader_config = self._default_if_none(predict_loader_config, {})
+        common_loader_config = self._default_if_none(common_loader_config, {})
+
+        self._validate_compatible_selection_argument(selections)
+        self.selections = selections
+
+        self._common_dataset_config = dataset_config
+        from graphnet.data.dataset.sharded.sharded import ParquetSharded
+        self.base_dataset = ParquetSharded(
+            graph_definition=graph_definition,
+            **asdict(self._common_dataset_config)
+        )
+
+        self._train_loader_config = self._add_loader_dicts(common_loader_config, train_loader_config)
+        self._val_loader_config = self._add_loader_dicts(common_loader_config, val_loader_config)
+        self._test_loader_config = self._add_loader_dicts(common_loader_config, test_loader_config)
+        self._predict_loader_config = self._add_loader_dicts(common_loader_config, predict_loader_config)
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.base_dataset.spawn_subdataset(self.selections["train"]),
+            **self._train_loader_config
+        )
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.base_dataset.spawn_subdataset(self.selections["val"]),
+            **self._val_loader_config
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.base_dataset.spawn_subdataset(self.selections["test"]),
+            **self._test_loader_config
+        )
+
+    def predict_dataloader(self):
+        return DataLoader(
+            self.base_dataset.spawn_subdataset(self.selections["predict"]),
+            **self._predict_loader_config
+        )
+
+    @staticmethod
+    def _add_loader_dicts(dict1, dict2):
+        d = deepcopy(dict1)
+        for k, v in dict2.items():
+            d[k] = v
+        d["collate_fn"] = collate_fn
+        return d
+
+    @staticmethod
+    def _default_if_none(value: Optional[T], default: T) -> T:
+        return value if value is not None else default
+
+    def _validate_compatible_selection_argument(self, selections):
+        for key in selections:
+            if key not in ["train", "val", "test", "predict"]:
+                raise ValueError(f"Unexpected key in selection dictionary: {key}")
+        for key, value in selections.items():
+            if isinstance(value, str):
+                value = _process_selection(value)
+            if isinstance(value, str):
+                raise ValueError(f"Unexpected string value in selection Dictionary:\n"
+                                 f"{key=}: {value=}")
+
+            assert(isinstance(value, list) and isinstance(value[0], int))
+            selections[key] = value
+
+        if "predict" not in selections and "test" in selections:
+            self.info("No prediction selections found, using test selections for predictions")
+            selections["predict"] = selections["test"]
