@@ -200,16 +200,6 @@ class AdversarialRegulatedNeuralNet(LightweightTemplateModel):
         )
 
         (task_loss - self._args.adv_weight * adv_loss).backward()
-        # from icecream import ic
-        # for module in self.modules():
-        #     c = 0
-        #     for param in module.parameters():
-        #         if param.grad is not None:
-        #             c += 1
-        #         else:
-        #             ic(f"No grad: {module.__class__}")
-        #     if c > 0:
-        #         ic(module.__class__)
         opt1.step()
 
         self.log_adv_metrics(

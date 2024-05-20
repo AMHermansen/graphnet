@@ -69,4 +69,3 @@ class GraphnetCLI(LightningCLI):
             "tasks.init_args.hidden_size",
             apply_on="instantiate",
         )
-

@@ -10,6 +10,8 @@ from torch_geometric.data import Data
 
 from graphnet.models.detector import IceCube86
 from graphnet.models.graphs import GraphDefinition, NodesAsPulses, KNNGraph
+from graphnet.utilities.logging import Logger
+import json
 
 
 class ParquetSharded(Dataset):
@@ -111,14 +113,14 @@ class ParquetSharded(Dataset):
             index_column: str = "event_no",
             selection: Optional[List[int]] = None,
             pulsemap_path: Optional[Union[str, Path]] = None,
-            node_feature_hook: Optional[Callable[[np.ndarray, int, "ParquetSharded"], np.ndarray]] = None,
+            node_hook: Optional[Callable[[np.ndarray, int, "ParquetSharded"], np.ndarray]] = None,
     ):
         self._meta_path = meta_path
         self._pulsemap = pulsemap
         self._truth = ([truth] if isinstance(truth, str) else truth)
         self._features = features
         self._graph_definition = graph_definition
-        self._node_feature_hook = node_feature_hook
+        self._node_feature_hook = node_hook
 
         self._pulsemap_path = self.get_default_if_none(
             pulsemap_path,
@@ -158,7 +160,7 @@ class ParquetSharded(Dataset):
 
         node_features = self.node_hook(
             node_features,
-            event_no,
+            idx,
         )
 
         graph = self._create_graph(
@@ -194,15 +196,3 @@ class ParquetSharded(Dataset):
     def convert_df_row_to_dict(df, row_id):
         row = df.iloc[row_id]
         return {k: row[k] for k in df.columns}
-
-
-if __name__ == "__main__":
-    data = ParquetSharded(
-        meta_path="/lustre/hpc/icecube/andreash/workspace/data_scripts/parquet_sharded/truth.parquet",
-        pulsemap="SplitInIcePulses",
-        truth=None,
-        features=["dom_x", "dom_y", "dom_z", "dom_time", "charge", "rde", "pmt_area"],
-        graph_definition=KNNGraph(IceCube86(), NodesAsPulses()),
-    )
-    print(len(data))
-    train_data = data.spawn_subdataset(pd.read_csv(""))

@@ -70,6 +70,21 @@ class DirectionReconstructionWithKappa(Task):
         return torch.stack((vec_x, vec_y, vec_z, kappa), dim=1)
 
 
+class DirectionReconstruction(Task):
+    default_target_labels = [
+        "zenith",
+        "azimuth",
+    ]
+    default_prediction_labels = [
+        "zenith_pred",
+        "azimuth_pred",
+    ]
+    nb_inputs = 2
+
+    def _forward(self, x: Tensor):
+        return x
+
+
 class ZenithReconstruction(Task):
     """Reconstructs zenith angle."""
 
@@ -164,10 +179,6 @@ class VertexReconstruction(Task):
 
     def _forward(self, x: Tensor) -> Tensor:
         # Scale xyz to roughly the right order of magnitude, leave time
-        x[:, 0] = x[:, 0] * 1e2
-        x[:, 1] = x[:, 1] * 1e2
-        x[:, 2] = x[:, 2] * 1e2
-
         return x
 
 
@@ -175,7 +186,7 @@ class PositionReconstruction(Task):
     """Reconstructs vertex position."""
 
     # Requires three features, x, y, and z.
-    default_target_labels = ["position"]
+    default_target_labels = ["position_x", "position_y", "position_z"]
     default_prediction_labels = [
         "position_x_pred",
         "position_y_pred",

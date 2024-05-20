@@ -116,7 +116,7 @@ class MAELitR(Model):
 
         # self.save_hyperparameters()
 
-    def _shared_step(self, data: Data) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _shared_step(self, data: Data) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x_pred, mask, ids_restore = self.encode(data)
         cls = x_pred[:, 0, :]
         if self.decoder_depth:
@@ -138,7 +138,7 @@ class MAELitR(Model):
         self.log(
             "train_ae",
             ae_loss,
-            batch_size=self._get_batch_size([data]),
+            batch_size=self._get_batch_size(data),
             prog_bar=True,
             on_epoch=True,
             on_step=True,
@@ -147,7 +147,7 @@ class MAELitR(Model):
         self.log(
             "train_cls",
             cls_loss,
-            batch_size=self._get_batch_size([data]),
+            batch_size=self._get_batch_size(data),
             prog_bar=True,
             on_epoch=True,
             on_step=False,

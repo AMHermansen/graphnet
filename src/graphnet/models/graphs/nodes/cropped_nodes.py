@@ -1,5 +1,4 @@
 """Node definitions that crop the number of pulses in a pulsemap."""
-
 from torch_geometric.data import Data
 import torch
 from torch import nn
@@ -7,7 +6,7 @@ from typing import Callable, Any, Optional, Tuple, List
 
 from graphnet.models.graphs.nodes.utils import fps
 from graphnet.models.graphs.nodes.nodes import NodesAsPulses, NodeDefinition
-
+from graphnet.utilities.decorators import deprecate_kwarg
 
 class PulsesCroppedValue(NodeDefinition):
     """Represent each node as pulse with an upper limit of nodes."""
@@ -17,9 +16,10 @@ class PulsesCroppedValue(NodeDefinition):
         """Return number of outputs."""
         return self.nb_inputs
 
+    @deprecate_kwarg({"max_pulses": "max_length"})
     def __init__(
         self,
-        max_pulses: int,
+        max_length: int = 128,
         transform: Callable[[torch.Tensor], torch.Tensor] = None,
         **kwargs: Any,
     ):
@@ -35,18 +35,18 @@ class PulsesCroppedValue(NodeDefinition):
         """
         transform = transform or nn.Identity()
         super().__init__(**kwargs)  # noqa
-        self.max_pulses = max_pulses
+        self.max_length = max_length
         self.transform = transform
 
     # abstract method(s)
     def _construct_nodes(
         self, x: torch.tensor, include_sensor_id: bool = False
     ) -> Data:
-        if x.shape[0] < self.max_pulses:
+        if x.shape[0] < self.max_length:
             return Data(x=x)
         return Data(
             x=x[
-                torch.sort(self.transform(x), dim=0).indices,
+                torch.sort(self.transform(x), dim=0).indices[:128],
                 :,
             ]
         )
@@ -60,27 +60,28 @@ class PulsesCroppedRandomly(NodeDefinition):
         """Return number of outputs."""
         return self.nb_inputs
 
-    def __init__(self, max_pulses: int, **kwargs: Any):
+    @deprecate_kwarg({"max_pulses": "max_length"})
+    def __init__(self, max_length: int = 128, **kwargs: Any):
         """Construct 'PulsesCroppedRandomly'.
 
         Selects at most 'max_pulses' number of pulses, chosen randomly.
 
         Args:
-            max_pulses: Maximal number of pulses allowed in the pulsemap.
+            max_length: Maximal number of pulses allowed in the pulsemap.
             **kwargs: kwargs passed to NodeDefinitions constructor.
         """
         super().__init__(**kwargs)  # noqa
-        self.max_pulses = max_pulses
+        self.max_length = max_length
 
     def _construct_nodes(
         self, x: torch.tensor, include_sensor_id: bool = False
     ) -> Data:
         x, maybe_sensor_id = self._maybe_split_sensor_id(x, include_sensor_id)
-        if x.shape[0] < self.max_pulses:
+        if x.shape[0] < self.max_length:
             data = Data(x=x)
             self._maybe_add_sensor_id(data, maybe_sensor_id)
             return data
-        shuffled_indices = torch.randperm(x.shape[0])
+        shuffled_indices = torch.randperm(x.shape[0])[:128]
         data = Data(x=x[shuffled_indices])
         data = self._maybe_add_sensor_id(
             data, shuffled_indices, maybe_sensor_id
@@ -104,7 +105,7 @@ class PulsesCroppedRandomly(NodeDefinition):
 class CroppedFPSNodes(NodeDefinition):
     def __init__(
         self,
-        max_length: int,
+        max_length: int = 128,
         fps_features: Optional[List[int]] = None,
         start_idx: Optional[int] = None,
     ):
@@ -137,7 +138,7 @@ class MaxNodesAsPulses(NodesAsPulses):
 
     def __init__(
         self,
-        max_length: int = 256,
+        max_length: int = 128,
         input_feature_names: Optional[List[str]] = None,
     ) -> None:
         """Construct `MaxNodesAsPulses`.

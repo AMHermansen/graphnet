@@ -447,7 +447,6 @@ class LatentWriter(BasePredictionWriter):
     def __init__(
             self,
             output_dir: Optional[str] = None,
-
     ):
         super().__init__(write_interval="batch")
         self._output_dir = output_dir

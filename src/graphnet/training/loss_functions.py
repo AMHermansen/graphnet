@@ -86,6 +86,48 @@ class MSELoss(LossFunction):
         return elements
 
 
+class DirectionOpeningAngle(LossFunction):
+    def __init__(
+            self,
+            opening_angle_loss: Optional[nn.Module()] = None,
+            **kwargs
+    ):
+        super().__init__(**kwargs)
+        self._opening_loss = self.set_default_if_none(opening_angle_loss, nn.SmoothL1Loss(reduction="none"))
+
+    def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
+        z_t = target[..., 0]
+        a_t = target[..., 1]
+
+        z_p = prediction[..., 0]
+        a_p = prediction[..., 1]
+
+        sin_zt = torch.sin(z_t)
+        sin_zp = torch.sin(z_p)
+
+        direction_t = torch.stack(
+            [
+                torch.cos(z_t),
+                sin_zt * torch.cos(a_t),
+                sin_zt * torch.sin(a_t),
+            ],
+            dim=-1,
+        )
+        direction_p = torch.stack(
+            [
+                torch.cos(z_p),
+                sin_zp * torch.cos(a_p),
+                sin_zp * torch.sin(a_p),
+            ],
+            dim=-1,
+        )
+
+        opening_angle = torch.arccos((direction_t * direction_p).sum(dim=-1))
+        best_opening = torch.ones_like(opening_angle)
+        loss = self._opening_loss(opening_angle, best_opening)
+        return loss
+
+
 class RMSELoss(MSELoss):
     """Root mean squared error loss."""
 
@@ -116,6 +158,8 @@ class LogCoshLoss(LossFunction):
         """Implement loss calculation."""
         diff = prediction - target
         elements = self._log_cosh(diff)
+        if len(elements.shape) > 1:
+            elements = torch.sum(elements, dim=tuple(range(1, len(elements.shape))))
         return elements
 
 
@@ -134,6 +178,7 @@ class CrossEntropyLoss(LossFunction):
     ):
         """Construct CrossEntropyLoss."""
         # Base class constructor
+
         super().__init__(**kwargs)
 
         # Member variables
@@ -142,7 +187,6 @@ class CrossEntropyLoss(LossFunction):
         self._options = options
         self._nb_classes: int
         if isinstance(self._options, int):
-            assert self._options in [torch.int32, torch.int64]
             assert (
                 self._options >= 2
             ), f"Minimum of two classes required. Got {self._options}."
@@ -203,6 +247,7 @@ class CrossEntropyLoss(LossFunction):
                 f"terminating program."
             )
             raise ValueError("Unknown type for option.")
+
         return self._loss(
             prediction.float().to("cpu"), target_integer.to("cpu")
         )
@@ -402,6 +447,48 @@ class VonMisesFisherLoss(LossFunction):
         raise NotImplementedError
 
 
+class ZenithMarginalVonMises2DLoss(VonMisesFisherLoss):
+    def _forward(self, prediction: Tensor, target: Tensor) -> Tensor:
+        """
+
+        Args:
+            prediction: Tensor containing predicted zenith and predicted kappa.
+            target: Zenith
+
+        Returns:
+
+        """
+        assert prediction.dim() == 2 and prediction.size()[1] == 2
+        assert target.dim() == 2
+        assert prediction.size()[0] == target.size()[0]
+
+        angle_true = target[:, 0]
+        t = torch.stack(
+            [
+                torch.cos(angle_true),
+                torch.sin(angle_true),
+            ],
+            dim=1,
+        )
+
+        # Formatting prediction
+        angle_pred = prediction[:, 0]
+        kappa = prediction[:, 1]
+        p = kappa.unsqueeze(1) * torch.stack(
+            [
+                torch.cos(angle_pred),
+                torch.sin(angle_pred),
+            ],
+            dim=1,
+        )
+        expression = (
+            - self.log_cmk(3, kappa)  # log C_3(k)
+            - kappa * p[:, 0] * t[:, 0]  # kappa * \cos \theta_p * \cos \theta_t
+            + self.log_cmk(2, kappa * p[:, 1] * p[:, 1])  # - log C_2(k * \sin \theta_p * \sin \theta_t)
+        )
+        return expression
+
+
 class VonMisesFisher2DLoss(VonMisesFisherLoss):
     """von Mises-Fisher loss function vectors in the 2D plane."""
 
@@ -457,6 +544,7 @@ class ZenithAdjustedVMF(VonMisesFisher2DLoss):
 class CosZenithAdjustedVMF(ZenithAdjustedVMF):
     def _forward(self, predictions: torch.Tensor, target: torch.Tensor):
         target = (1 - torch.cos(target)) * (torch.pi / 2.)
+        predictions[:, 1].abs_()
         return super()._forward(predictions, target)
 
 

@@ -1,4 +1,5 @@
 """Datamodule class."""
+import json
 from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import dataclass, asdict
@@ -20,6 +21,7 @@ from graphnet.training.utils import (
     make_dataloader, collate_fn,
 )
 from graphnet.utilities.logging import Logger
+from graphnet.data.dataset.sharded.node_hooks import NodeHook
 
 
 if TYPE_CHECKING:
@@ -217,8 +219,7 @@ class ShardedDatasetConfig:
     index_column: str = "event_no"
     pulsemap_path: Optional[Union[str, Path]] = None
     selection: Optional[List[int]] = None
-    node_feature_hook: Optional[
-        Callable[[np.ndarray, int, "ParquetSharded"], np.ndarray]] = None,
+    node_hook: Optional[Union[Callable[[np.ndarray, int, "ParquetSharded"], np.ndarray], NodeHook]] = None
 
 
 class ShardedDataModule(Logger, LightningDataModule):
@@ -234,8 +235,9 @@ class ShardedDataModule(Logger, LightningDataModule):
             test_loader_config: Optional[Dict[str, Any]] = None,
             predict_loader_config: Optional[Dict[str, Any]] = None,
             common_loader_config: Optional[Dict[str, Any]] = None,
+            **kwargs,
     ):
-        super().__init__()
+        super().__init__(name=__name__, class_name=self.__class__.__name__, **kwargs)
         train_loader_config = self._default_if_none(train_loader_config, {})
         val_loader_config = self._default_if_none(val_loader_config, {})
         test_loader_config = self._default_if_none(test_loader_config, {})
@@ -256,6 +258,11 @@ class ShardedDataModule(Logger, LightningDataModule):
         self._val_loader_config = self._add_loader_dicts(common_loader_config, val_loader_config)
         self._test_loader_config = self._add_loader_dicts(common_loader_config, test_loader_config)
         self._predict_loader_config = self._add_loader_dicts(common_loader_config, predict_loader_config)
+
+        self.debug(f"Train Dataloader Kwargs: {str(self._train_loader_config)}")
+        self.debug(f"Validation Dataloader Kwargs: {str(self._val_loader_config)}")
+        self.debug(f"Test Dataloader Kwargs: {str(self._test_loader_config)}")
+        self.debug(f"Predict Dataloader Kwargs: {str(self._predict_loader_config)}")
 
     def train_dataloader(self):
         return DataLoader(

@@ -2,10 +2,9 @@
 from typing import Optional, List
 
 import torch
-from icecream import ic
 from torch_geometric.data import Data
 from torch_geometric.utils import to_dense_batch
-from graphnet.models.graphs.edges import EdgeDefinition
+from graphnet.models.graphs.edges.edges import EdgeDefinition
 
 
 def compute_minkowski_distance_mat(
@@ -26,19 +25,15 @@ def compute_minkowski_distance_mat(
 
     Returns: Matrix of shape (n, m) of all pairwise Minkowski distances.
     """
-    assert x.shape == y.shape, "x and y must have the same shape"
-    assert x.dim() == 2, "x and y must be 2-dimensional"
+    space_coords = space_coords or [0, 1, 2]
+    assert x.dim() == 2, "x must be 2-dimensional"
+    assert y.dim() == 2, "x must be 2-dimensional"
     dist = x[:, None] - y[None, :]
     pos = dist[:, :, space_coords]
     time = dist[:, :, time_coord] * c
     return (pos**2).sum(dim=-1) - time**2
 
 
-# TODO: Replace use of MinkowskiKNNEdges with
-#   custom Cuda/cpp kernel for reduced memory usage.
-#   Currently, O(n^2) memory is used, but O(n*k) is possible.
-#   Where n is the number of points in the largest event,
-#   and k is the number of neighbours to connect to.
 class MinkowskiKNNEdges(EdgeDefinition):
     """Builds edges between most light-like separated."""
 
@@ -74,28 +69,31 @@ class MinkowskiKNNEdges(EdgeDefinition):
         row = []
         col = []
         for batch in range(x.shape[0]):
+            x_masked = x[batch][mask[batch]]
             distance_mat = compute_minkowski_distance_mat(
-                x_masked := x[batch][mask[batch]],
-                x_masked,
-                self.c,
-                self.space_coords,
-                self.time_coord,
+                x=x_masked,
+                y=x_masked,
+                c=self.c,
+                space_coords=self.space_coords,
+                time_coord=self.time_coord,
             )
             num_points = x_masked.shape[0]
             num_edges = min(self.nb_nearest_neighbours, num_points)
             col += [
                 c
-                for c in range(count, count + num_edges)
-                for _ in range(num_points)
+                for c in range(num_points)
+                for _ in range(count, count + num_edges)
             ]
-            distance_mat[distance_mat < 0] *= self.time_like_weight
-
+            distance_mat[distance_mat < 0] *= -self.time_like_weight
+            distance_mat += (
+                torch.eye(distance_mat.shape[0]) * 1e9
+            )  # self-loops
             distance_sorted = distance_mat.argsort(dim=1)
             distance_sorted += count  # offset by previous events
             row += distance_sorted[:num_edges].flatten().tolist()
             count += num_points
 
         graph.edge_index = torch.tensor(
-            [col, row], dtype=torch.long, device=graph.x.device
+            [row, col], dtype=torch.long, device=graph.x.device
         )
         return graph

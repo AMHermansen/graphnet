@@ -1,10 +1,13 @@
 """Classification-specific `Model` class(es)."""
 from pathlib import Path
-from typing import Any, Union, List, Optional
+from typing import Any, Union, List, Optional, Dict, Tuple, Type, Callable
 
 import pandas as pd
 import torch
-from torch import Tensor
+from torch import Tensor, nn
+from torch_geometric.data import Data
+from torch_geometric.utils import to_dense_batch
+from torchmetrics import Metric, Accuracy, AUROC
 
 from graphnet.models.task import Task, IdentityTask
 from graphnet.constants import STYLESHEET_PATH
@@ -140,13 +143,86 @@ class BinaryClassificationTask(Task):
         return torch.sigmoid(x)
 
 
-class BinaryClassificationTaskLogits(Task):
+class BinaryClassificationTaskLogits(IdentityTask):
     """Performs binary classification form logits."""
+    def __init__(self,
+                 target_labels: Union[List[str], Any],
+                 prediction_labels: Optional[List[str]] = None,
+                 *args,
+                 **kwargs
+                 ):
+        super().__init__(nb_outputs=1, target_labels=target_labels, *args, **kwargs)
 
-    # Requires one feature, logit for being signal class.
-    nb_inputs = 1
-    default_target_labels = ["target"]
-    default_prediction_labels = ["target_pred"]
+        if prediction_labels is not None:
+            self._default_prediction_labels = prediction_labels
+            self._prediction_labels = prediction_labels
 
     def _forward(self, x: Tensor) -> Tensor:
         return x
+
+
+class MAEClassificationTask(Task):
+    default_target_labels = ["sensor_id"]
+    _forward = nn.Identity()
+
+    def __init__(
+            self,
+            hidden_size: int,
+            number_of_sensors: int = 5484,
+    ):
+        from graphnet.training.loss_functions import CrossEntropyLoss
+        self._number_of_sensors = number_of_sensors
+        super().__init__(
+            hidden_size=hidden_size,
+            loss_function=CrossEntropyLoss(self._number_of_sensors)
+        )
+
+    @property
+    def default_prediction_labels(self) -> List[str]:
+        return [f"sensor_{i}_logit" for i in range(self._number_of_sensors)]
+
+    @property
+    def nb_inputs(self) -> int:
+        return self._number_of_sensors
+
+    @property
+    def default_metrics(self) -> Dict[str, Tuple[Union[Type[Metric], Callable[[], Metric]], bool]]:
+        return {
+            "acc1": (lambda: Accuracy(task="multiclass", num_classes=self._number_of_sensors, top_k=1), True),
+            "acc10": (lambda: Accuracy(task="multiclass", num_classes=self._number_of_sensors, top_k=10), True),
+            "acc100": (lambda: Accuracy(task="multiclass", num_classes=self._number_of_sensors, top_k=100), True),
+            "acc1000": (lambda: Accuracy(task="multiclass", num_classes=self._number_of_sensors, top_k=1000), True),
+            # "auc": (lambda: AUROC(task="multiclass", num_classes=self._number_of_sensors), True)
+        }
+
+    def compute_loss(self, pred: Tensor, data: Data) -> Tensor:
+        sensor_id = data.sensor_id
+        batch = data.old_batch
+        sensor_id, _ = to_dense_batch(sensor_id, batch, fill_value=-1)
+        sensor_id = sensor_id.to(torch.int64)
+        ae_mask = data.ae_mask
+
+        loss = 0.
+        for pred_event, sensor_id_event, ae_mask_event in zip(
+                pred, sensor_id, ae_mask
+        ):
+            sensor_id_event = sensor_id_event[ae_mask_event]
+            pred_event = pred_event.repeat(sensor_id_event.shape[0], 1)
+            loss += self._loss_function(pred_event, sensor_id_event)
+        return loss / pred.shape[0]
+
+    def compute_metrics(self, pred: Union[Tensor, Data], data: Data, train: bool = True):
+        sensor_id = data.sensor_id
+        batch = data.old_batch
+        sensor_id, _ = to_dense_batch(sensor_id, batch, fill_value=-1)
+        sensor_id = sensor_id.to(torch.int64)
+        ae_mask = data.ae_mask
+
+        for pred_event, sensor_id_event, ae_mask_event in zip(
+                pred, sensor_id, ae_mask
+        ):
+            sensor_id_event = sensor_id_event[ae_mask_event]
+            pred_event = pred_event.repeat(sensor_id_event.shape[0], 1)
+            metrics = self.train_metrics if train else self.val_metrics
+            for metric in metrics.values():
+                metric(pred_event, sensor_id_event)

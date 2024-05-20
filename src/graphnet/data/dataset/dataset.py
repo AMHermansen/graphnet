@@ -665,12 +665,8 @@ class GNDatasetBase(
                 "v_e": int(abs_pid == 12),
                 "v_u": int(abs_pid == 14),
                 "v_t": int(abs_pid == 16),
-                "track": int(
-                    (abs_pid == 14) & (truth_dict["interaction_type"] == 1)
-                ),
-                "cascade": 1 ^ int(
-                    (abs_pid == 14) & (truth_dict["interaction_type"] == 1)
-                ),
+                "track": 1 if (abs_pid == 14) & (truth_dict["interaction_type"] == 1) else 0,
+                "cascade": 0 if (abs_pid == 14) & (truth_dict["interaction_type"] == 1) else 1,
                 "dbang": self._get_dbang_label(truth_dict),
                 "corsika": int(abs_pid > 20),
                 "is_data": int(sim_type == "data"),

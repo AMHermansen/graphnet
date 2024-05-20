@@ -215,7 +215,6 @@ class Task(Model):
     def _forward(self, x: Union[Tensor, Data]) -> Union[Tensor, Data]:
         """Syntax like `.forward`, for implentation in inheriting classes."""
 
-    @final
     def compute_loss(self, pred: Union[Tensor, Data], data: Data) -> Tensor:
         """Compute loss of `pred` wrt.
 
@@ -225,6 +224,7 @@ class Task(Model):
             [data[label] for label in self._target_labels], dim=1
         )
         target = self._transform_target(target)
+
         if self._loss_weight is not None:
             weights = data[self._loss_weight]
         else:
